@@ -25,6 +25,21 @@ def compute_opcode_hex(opcode_int: int) -> str:
     assert isinstance(opcode_int, int) and 0 <= opcode_int <= 255
     return f'{opcode_int:02X}'
 
+def compute_pp(rec) -> str:
+    pp = []
+    if rec.no_prefixes_allowed:
+        assert not (rec.osz_required or rec.f2_required or rec.f3_required)
+        pp.append('NP')
+    else:
+        if rec.osz_required:
+            pp.append('66')
+        if rec.f2_required:
+            pp.append('F2')
+        if rec.f3_required:
+            pp.append('F3')
+    assert rec.space == 'legacy' or len(pp) == 1
+    return ' '.join(pp)
+
 def fix_xed_db(xed_db):
     for rec in xed_db.recs:
         rec.pattern = remove_extra_spaces(rec.pattern)
@@ -32,6 +47,7 @@ def fix_xed_db(xed_db):
         rec.opcode_int = rec.opcode_base10
         del rec.opcode_base10
         rec.opcode_hex = compute_opcode_hex(rec.opcode_int)
+        rec.pp = compute_pp(rec)
 
     print(f'[INFO] number of instrunction defs: {len(xed_db.recs)}')
     return xed_db
