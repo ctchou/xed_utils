@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 
-from argparse import ArgumentParser, Namespace
 import sys
-import re
-import inspect
 import csv
 import json
 import sqlite3
 from pathlib import Path
+from argparse import ArgumentParser, Namespace
 from typing import Any, List, Tuple
 
 XED_DB = Any
 INST_REC = Any
+XED_DATA = Any
 
-def input_xed_db(dgen: str, pysrc: str, mbuild: str) -> XED_DB:
+def input_xed_db(dgen: str, pysrc: str) -> XED_DB:
     sys.path.append(pysrc)
-    sys.path.append(mbuild)
     import gen_setup
     args = Namespace(prefix=dgen)
     gen_setup.make_paths(args)
@@ -42,70 +40,63 @@ def compute_pp(rec: INST_REC) -> str:
         if rec.f3_required:
             pp.append('F3')
     assert rec.space == 'legacy' or len(pp) == 1
-    return ' '.join(pp)
+    return pp
+
+def attr_excluded(attr: str) -> bool:
+    return attr in ['get_eosz_list'] or attr.startswith('__')
 
 def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
     inst_attrs = set([])
     for rec in xed_db.recs:
+        rec.opcode_int = rec.opcode_base10
+        rec.opcode_hex = compute_opcode_hex(rec.opcode_int)
+        del rec.opcode_base10
+        rec.pp = compute_pp(rec)
+        rec.eosz_list = rec.get_eosz_list()
         rec.pattern = remove_extra_spaces(rec.pattern)
         rec.operands = remove_extra_spaces(rec.operands)
         assert ' '.join(rec.operand_list) == rec.operands
         del rec.operand_list
         del rec.parsed_operands
-        rec.opcode_int = rec.opcode_base10
-        del rec.opcode_base10
-        rec.opcode_hex = compute_opcode_hex(rec.opcode_int)
-        rec.pp = compute_pp(rec)
+        rec.cpuid_fields = [ str(r) for g in rec.cpuid_groups for r in g.get_records() ]
+        del rec.cpuid_groups
         for attr in dir(rec):
-            if not attr.startswith('__'):
+            if not attr_excluded(attr):
                 inst_attrs.add(attr)
+                val = getattr(rec, attr)
     inst_attrs = sorted(list(inst_attrs))
     print(f'[INFO] number of instrunction defs: {len(xed_db.recs)}')
     print(f'[INFO] instruction attributes: {inst_attrs}')
     return (xed_db, inst_attrs)
 
-def get_inst_attr(rec: INST_REC, attr: str) -> Any:
-    val = getattr(rec, attr, None)
-    if inspect.ismethod(val):
-        val = val()
-    return ValueError
-
-def convert_xed_db(xed_db, inst_attrs):
-    insts = []
+def convert_xed_db(xed_db: XED_DB, inst_attrs: List[str]) -> XED_DATA:
+    inst_list = []
     for rec in xed_db.recs:
         inst = {}
         for attr in inst_attrs:
-            val = getattr(rec, attr, None)
-            if inspect.ismethod(val):
-                val = val()
-            if val != None:
-                if not (isinstance(val, int) or isinstance(val, str)):
-                    print(attr, val)
+            inst[attr] = getattr(rec, attr, None)
+        inst_list.append(inst)
+    xed_data = {'Instructions': inst_list}
+    return xed_data
 
-    return xed_db
-
-def output_csv(xed_db: XED_DB) -> None:
+def output_csv(xed_data: XED_DATA) -> None:
     pass
 
-def output_json(xed_db: XED_DB, json_file: str) -> None:
-    pass
-    # data = {}
-    # with open(json_file, 'r') as json_fp:
-    #     json.dump(xed_db, json_fp, sort_keys=True, indent=4)
+def output_json(xed_data: XED_DATA, json_file: str) -> None:
+    with open(json_file, 'w') as json_fp:
+        json.dump(xed_data, json_fp, sort_keys=True, indent=4)
 
-def output_sqlite(xed_db: XED_DB) -> None:
+def output_sqlite(xed_data: XED_DATA) -> None:
     pass
 
 default_root = Path(__file__).resolve().parent.parent
 default_dgen = str(default_root / 'build/obj/dgen')
 default_pysrc = str(default_root / 'xed/pysrc')
-default_mbuild = str(default_root / 'mbuild')
 
 def process_args() -> Namespace:
     parser = ArgumentParser(description='Extract a database from a XED build')
     parser.add_argument('--dgen', default=default_dgen, help=f'the dgen directory of a XED build (default: {default_dgen})')
     parser.add_argument('--pysrc', default=default_pysrc, help=f'pathname of xed/pysrc (default: {default_pysrc})')
-    parser.add_argument('--mbuild', default=default_mbuild, help=f'pathname of mbuild (default: {default_mbuild})')
     parser.add_argument('-c', '--csv', type=str, help='output CSV file')
     parser.add_argument('-j', '--json', type=str, help='output JSON file')
     parser.add_argument('-s', '--sqlite', type=str, help='output SQLite database')
@@ -120,15 +111,15 @@ def process_args() -> Namespace:
 
 def main() -> None:
     args = process_args()
-    xed_db = input_xed_db(args.dgen, args.pysrc, args.mbuild)
+    xed_db = input_xed_db(args.dgen, args.pysrc)
     (xed_db, inst_attrs) = fix_xed_db(xed_db)
-    xed_db = convert_xed_db(xed_db, inst_attrs)
+    xed_data = convert_xed_db(xed_db, inst_attrs)
     if args.csv:
-        output_csv(xed_db)
+        output_csv(xed_data)
     if args.json:
-        output_json(xed_db, args.json_file)
+        output_json(xed_data, args.json)
     if args.sqlite:
-        output_sqlite(xed_db)
+        output_sqlite(xed_data)
 
 if __name__ == '__main__':
     main()
