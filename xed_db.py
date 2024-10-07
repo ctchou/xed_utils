@@ -45,6 +45,7 @@ def compute_pp(rec: INST_REC) -> str:
 def attr_excluded(attr: str) -> bool:
     return attr in ['get_eosz_list'] or attr.startswith('__')
 
+
 def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
     inst_attrs = set([])
     for rec in xed_db.recs:
@@ -58,6 +59,12 @@ def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
         assert ' '.join(rec.operand_list) == rec.operands
         del rec.operand_list
         del rec.parsed_operands
+        if hasattr(rec, 'attributes'):
+            rec.attributes = rec.attributes.split()
+        else:
+            rec.attributes = []
+        if hasattr(rec, 'flags'):
+            rec.flags = remove_extra_spaces(rec.flags)
         rec.cpuid_fields = [ str(r) for g in rec.cpuid_groups for r in g.get_records() ]
         del rec.cpuid_groups
         for attr in dir(rec):
