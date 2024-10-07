@@ -23,6 +23,9 @@ def input_xed_db(dgen: str, pysrc: str) -> XED_DB:
 def remove_extra_spaces(s: str) -> str:
     return ' '.join(s.split())
 
+def str_of_list(xs: List[Any]) -> str:
+    return ' '.join([ str(x) for x in xs ])
+
 def compute_opcode_hex(opcode_int: int) -> str:
     assert isinstance(opcode_int, int) and 0 <= opcode_int <= 255
     return f'{opcode_int:02X}'
@@ -40,11 +43,17 @@ def compute_pp(rec: INST_REC) -> str:
         if rec.f3_required:
             pp.append('F3')
     assert rec.space == 'legacy' or len(pp) == 1
-    return pp
+    return str_of_list(pp)
+
+def compute_eosz_list(rec: INST_REC) -> str:
+    eosz_list = rec.get_eosz_list()
+    if eosz_list:
+        return str_of_list(eosz_list)
+    else:
+        return None
 
 def attr_excluded(attr: str) -> bool:
     return attr in ['get_eosz_list'] or attr.startswith('__')
-
 
 def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
     inst_attrs = set([])
@@ -53,24 +62,23 @@ def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
         rec.opcode_hex = compute_opcode_hex(rec.opcode_int)
         del rec.opcode_base10
         rec.pp = compute_pp(rec)
-        rec.eosz_list = rec.get_eosz_list()
+        rec.eosz_list = compute_eosz_list(rec)
         rec.pattern = remove_extra_spaces(rec.pattern)
         rec.operands = remove_extra_spaces(rec.operands)
-        assert ' '.join(rec.operand_list) == rec.operands
+        assert str_of_list(rec.operand_list) == rec.operands
         del rec.operand_list
         del rec.parsed_operands
+        rec.explicit_operands = str_of_list(rec.explicit_operands)
+        rec.implicit_operands = str_of_list(rec.implicit_operands)
         if hasattr(rec, 'attributes'):
-            rec.attributes = rec.attributes.split()
-        else:
-            rec.attributes = []
+            rec.attributes = remove_extra_spaces(rec.attributes)
         if hasattr(rec, 'flags'):
             rec.flags = remove_extra_spaces(rec.flags)
-        rec.cpuid_fields = [ str(r) for g in rec.cpuid_groups for r in g.get_records() ]
+        rec.cpuid_fields = str_of_list([ str(r) for g in rec.cpuid_groups for r in g.get_records() ])
         del rec.cpuid_groups
         for attr in dir(rec):
             if not attr_excluded(attr):
                 inst_attrs.add(attr)
-                val = getattr(rec, attr)
     inst_attrs = sorted(list(inst_attrs))
     print(f'[INFO] number of instrunction defs: {len(xed_db.recs)}')
     print(f'[INFO] instruction attributes: {inst_attrs}')
@@ -81,19 +89,25 @@ def convert_xed_db(xed_db: XED_DB, inst_attrs: List[str]) -> XED_DATA:
     for rec in xed_db.recs:
         inst = {}
         for attr in inst_attrs:
+            val = getattr(rec, attr, None)
+            assert val is None or isinstance(val, int) or isinstance(val, str)
             inst[attr] = getattr(rec, attr, None)
         inst_list.append(inst)
     xed_data = {'Instructions': inst_list}
     return xed_data
 
-def output_csv(xed_data: XED_DATA) -> None:
-    pass
-
 def output_json(xed_data: XED_DATA, json_file: str) -> None:
     with open(json_file, 'w') as json_fp:
         json.dump(xed_data, json_fp, sort_keys=True, indent=4)
 
-def output_sqlite(xed_data: XED_DATA) -> None:
+def output_csv(xed_data: XED_DATA, inst_attrs: List[str], csv_file: str) -> None:
+    with open(csv_file, 'w') as csv_fp:
+        csv_writer = csv.DictWriter(csv_fp, fieldnames=inst_attrs)
+        csv_writer.writeheader()
+        for inst in xed_data['Instructions']:
+            csv_writer.writerow(inst)
+
+def output_sqlite(xed_data: XED_DATA, inst_attrs: List[str], sqlite_file: str) -> None:
     pass
 
 default_root = Path(__file__).resolve().parent.parent
@@ -121,12 +135,12 @@ def main() -> None:
     xed_db = input_xed_db(args.dgen, args.pysrc)
     (xed_db, inst_attrs) = fix_xed_db(xed_db)
     xed_data = convert_xed_db(xed_db, inst_attrs)
-    if args.csv:
-        output_csv(xed_data)
     if args.json:
         output_json(xed_data, args.json)
+    if args.csv:
+        output_csv(xed_data, inst_attrs, args.csv)
     if args.sqlite:
-        output_sqlite(xed_data)
+        output_sqlite(xed_data, inst_attrs, args.sqlite)
 
 if __name__ == '__main__':
     main()
