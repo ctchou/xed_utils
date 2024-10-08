@@ -61,6 +61,8 @@ def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
         rec.opcode_int = rec.opcode_base10
         rec.opcode_hex = compute_opcode_hex(rec.opcode_int)
         del rec.opcode_base10
+        assert rec.real_opcode == 'Y'
+        del rec.real_opcode
         rec.pp = compute_pp(rec)
         rec.eosz_list = compute_eosz_list(rec)
         rec.pattern = remove_extra_spaces(rec.pattern)
@@ -92,8 +94,8 @@ def convert_xed_db(xed_db: XED_DB, inst_attrs: List[str]) -> XED_DATA:
         inst = {}
         for attr in inst_attrs:
             val = getattr(rec, attr, None)
-            assert val is None or isinstance(val, int) or isinstance(val, str)
-            inst[attr] = getattr(rec, attr, None)
+            assert val is None or isinstance(val, bool) or isinstance(val, int) or isinstance(val, str)
+            inst[attr] = val
         inst_list.append(inst)
     xed_data = {'Instructions': inst_list}
     return xed_data
@@ -109,11 +111,11 @@ def output_csv(xed_data: XED_DATA, inst_attrs: List[str], csv_file: str) -> None
         for inst in xed_data['Instructions']:
             csv_writer.writerow(inst)
 
-def sql_create_cmd(table: str, keys: List[str]) -> str:
+def sql_create(table: str, keys: List[str]) -> str:
     keys_list = ','.join(keys)
     return f'CREATE TABLE {table} ({keys_list})'
 
-def sql_insert_cmd(table: str, keys: List[str], vals: List[Any]) -> str:
+def sql_insert(table: str, keys: List[str], vals: List[Any]) -> str:
     keys_list = ','.join(keys)
     vals_list = ','.join(vals)
     return f'INSERT INTO {table} ({keys_list}) VALUES ({vals_list})'
@@ -127,14 +129,15 @@ def sql_insert_inst(inst: Dict[str, Optional[int | str]], inst_attrs: List[str])
         elif isinstance(val, str):
             inst_vals.append('"' + val + '"')
         else:
+            assert val is None
             inst_vals.append('NULL')
-    return sql_insert_cmd('Instructions', inst_attrs, inst_vals)
+    return sql_insert('Instructions', inst_attrs, inst_vals)
 
 def output_sqlite(xed_data: XED_DATA, inst_attrs: List[str], sqlite_file: str) -> None:
     sqlite_path = Path(sqlite_file)
     sqlite_path.unlink(missing_ok=True)
     with sqlite3.connect(sqlite_path) as sqlite_db:
-        create_cmd = sql_create_cmd('Instructions', inst_attrs)
+        create_cmd = sql_create('Instructions', inst_attrs)
         sqlite_db.execute(create_cmd)
         for inst in xed_data['Instructions']:
             insert_cmd = sql_insert_inst(inst, inst_attrs)
