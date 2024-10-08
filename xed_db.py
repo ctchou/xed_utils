@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Dict, Optional
 
 XED_DB = Any
 INST_REC = Any
@@ -74,6 +74,8 @@ def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
             rec.attributes = remove_extra_spaces(rec.attributes)
         if hasattr(rec, 'flags'):
             rec.flags = remove_extra_spaces(rec.flags)
+        if hasattr(rec, 'comment'):
+            rec.comment = remove_extra_spaces(rec.comment).replace('"', "''")
         rec.cpuid_fields = str_of_list([ str(r) for g in rec.cpuid_groups for r in g.get_records() ])
         del rec.cpuid_groups
         for attr in dir(rec):
@@ -107,8 +109,36 @@ def output_csv(xed_data: XED_DATA, inst_attrs: List[str], csv_file: str) -> None
         for inst in xed_data['Instructions']:
             csv_writer.writerow(inst)
 
+def sql_create_cmd(table: str, keys: List[str]) -> str:
+    keys_list = ','.join(keys)
+    return f'CREATE TABLE {table} ({keys_list})'
+
+def sql_insert_cmd(table: str, keys: List[str], vals: List[Any]) -> str:
+    keys_list = ','.join(keys)
+    vals_list = ','.join(vals)
+    return f'INSERT INTO {table} ({keys_list}) VALUES ({vals_list})'
+
+def sql_insert_inst(inst: Dict[str, Optional[int | str]], inst_attrs: List[str]) -> str:
+    inst_vals = []
+    for attr in inst_attrs:
+        val = inst[attr]
+        if isinstance(val, int):
+            inst_vals.append(str(val))
+        elif isinstance(val, str):
+            inst_vals.append('"' + val + '"')
+        else:
+            inst_vals.append('NULL')
+    return sql_insert_cmd('Instructions', inst_attrs, inst_vals)
+
 def output_sqlite(xed_data: XED_DATA, inst_attrs: List[str], sqlite_file: str) -> None:
-    pass
+    sqlite_path = Path(sqlite_file)
+    sqlite_path.unlink(missing_ok=True)
+    with sqlite3.connect(sqlite_path) as sqlite_db:
+        create_cmd = sql_create_cmd('Instructions', inst_attrs)
+        sqlite_db.execute(create_cmd)
+        for inst in xed_data['Instructions']:
+            insert_cmd = sql_insert_inst(inst, inst_attrs)
+            sqlite_db.execute(insert_cmd)
 
 default_root = Path(__file__).resolve().parent.parent
 default_dgen = str(default_root / 'build/obj/dgen')
