@@ -38,7 +38,7 @@ def all_maps() -> str:
 }}
 
 .collapsible:after {{
-  content: '\002B';
+  content: '\\002B';
   color: white;
   font-weight: bold;
   float: right;
@@ -46,7 +46,7 @@ def all_maps() -> str:
 }}
 
 .active:after {{
-  content: "\2212";
+  content: "\\2212";
 }}
 
 .content {{
