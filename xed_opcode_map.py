@@ -6,37 +6,28 @@ from typing import Any, List, Tuple, Dict, Optional
 
 INST_DB = sqlite3.Connection
 
-def get_insts(db: INST_DB, map_id: int, opc: int) -> List[str]:
-    return ['FOO', 'BAR', 'XYZ']
+def sql_query(map_id: int, opcode: int) -> str:
+    return f'''
+        SELECT DISTINCT iclass, space, pp
+        FROM Instructions
+        WHERE map == {map_id}
+        AND ( opcode_int == {opcode} OR
+              (partial_opcode == 1 AND {opcode} BETWEEN opcode_int AND opcode_int + 7) );
+'''
+
+def get_insts(db: INST_DB, map_id: int, opcode: int) -> List[str]:
+    rows = db.execute(sql_query(map_id, opcode))
+
+    return [ row['iclass'] for row in rows ]
 
 def html_cell(db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
     opc_int = 16 * row_id + col_id
     opc_hex = f'{opc_int:02X}'
-    opc_insts = '\n<br>\n'.join(get_insts(db, map_id, opc_int))
+    opc_insts = '<br>\n&emsp;'.join(get_insts(db, map_id, opc_int))
     return f'''
-<td style="padding: 0px">
-<div id="cell">
-<style>
-#cell td {{
-  border: 0px none;
-  text-align: left;
-}}
-</style>
-<table style="width: 100%">
-<tr>
-<td style="width: 1%">
-<b>{opc_hex}</b>
-</td>
-<td> </td>
-</tr>
-<tr>
-<td> </td>
 <td>
-{opc_insts}
-</td>
-</tr>
-</table>
-</div>
+<b style="font-size: 120%">{opc_hex}</b><br>
+&emsp;{opc_insts}
 </td>
 '''
 
@@ -106,8 +97,10 @@ def html_final(db: INST_DB) -> str:
   transition: max-height 0.2s ease-out;
 }}
 
-table, th, td {{
+table, tr, td {{
   border:1px solid black;
+  text-align: left;
+  vertical-align: text-top;
 }}
 
 </style>
