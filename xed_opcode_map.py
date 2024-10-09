@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 
-import argparse
 import sqlite3
-from pathlib import Path
+from argparse import ArgumentParser
 from typing import Any, List, Tuple, Dict, Optional
 
-def gen_cell(map_id: int, row_id: int, col_id: int) -> str:
+INST_DB = sqlite3.Connection
+
+def get_insts(db: INST_DB, map_id: int, opc: int) -> List[str]:
+    return ['FOO', 'BAR', 'XYZ']
+
+def html_cell(db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
     opc_int = 16 * row_id + col_id
     opc_hex = f'{opc_int:02X}'
+    opc_insts = '\n<br>\n'.join(get_insts(db, map_id, opc_int))
     return f'''
 <td style="padding: 0px">
 <div id="cell">
@@ -27,9 +32,7 @@ def gen_cell(map_id: int, row_id: int, col_id: int) -> str:
 <tr>
 <td> </td>
 <td>
-FOO
-<br>
-BAR
+{opc_insts}
 </td>
 </tr>
 </table>
@@ -37,16 +40,16 @@ BAR
 </td>
 '''
 
-def gen_row(map_id: int, row_id: int) -> str:
-    all_cols = '\n'.join([ gen_cell(map_id, row_id, col_id) for col_id in range(16) ])
+def html_row(db: INST_DB, map_id: int, row_id: int) -> str:
+    all_cols = '\n'.join([ html_cell(db, map_id, row_id, col_id) for col_id in range(16) ])
     return f'''
 <tr>
 {all_cols}
 </tr>
 '''
 
-def gen_map(map_id: int) -> str:
-    all_rows = '\n'.join([ gen_row(map_id, row_id) for row_id in range(16) ])
+def html_map(db: INST_DB, map_id: int) -> str:
+    all_rows = '\n'.join([ html_row(db, map_id, row_id) for row_id in range(16) ])
     return f'''
 <button class="collapsible">Map {map_id}</button>
 <div class="content">
@@ -58,8 +61,8 @@ def gen_map(map_id: int) -> str:
 </div>
 '''
 
-def gen_final() -> str:
-    all_maps = '\n'.join([ gen_map(map_id) for map_id in range(8) ])
+def html_final(db: INST_DB) -> str:
+    all_maps = '\n'.join([ html_map(db, map_id) for map_id in range(8) ])
     return f'''
 <!DOCTYPE html>
 <html>
@@ -125,7 +128,6 @@ x86 opcode map
 <script>
 var coll = document.getElementsByClassName("collapsible");
 var i;
-
 for (i = 0; i < coll.length; i++) {{
   coll[i].addEventListener("click", function() {{
     this.classList.toggle("active");
@@ -143,16 +145,22 @@ for (i = 0; i < coll.length; i++) {{
 </html>
 '''
 
-def output_opcode_map(out_file: str) -> str:
+def input_sqlite_db(db_file: str) -> INST_DB:
+    with sqlite3.connect(db_file) as db:
+        db.row_factory = sqlite3.Row
+        return db
+
+def output_opcode_map(db: INST_DB, out_file: str) -> None:
     with open(out_file, 'w') as out_fp:
-        out_fp.write(gen_final())
+        out_fp.write(html_final(db))
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Make HTML opcopde map from SQLite database extracted from a XED build')
+    parser = ArgumentParser(description='Make HTML opcopde map from SQLite database extracted from a XED build')
     parser.add_argument('sqlite', type=str, help='input SQLite database')
     parser.add_argument('html', type=str, help='output HTML opcode map')
     args = parser.parse_args()
-    output_opcode_map(args.html)
+    db = input_sqlite_db(args.sqlite)
+    output_opcode_map(db, args.html)
 
 if __name__ == '__main__':
     main()
