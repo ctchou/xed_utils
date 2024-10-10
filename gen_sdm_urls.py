@@ -6,24 +6,32 @@ import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
 from urllib.request import urlopen
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional
 
-INST_DB = sqlite3.Connection
+sdm_root_url = 'https://www.felixcloutier.com/x86/'
 
-this_dir = Path(__file__).resolve().parent
-default_json = str(this_dir / 'sdm_urls.json')
+re_href = re.compile(r"<a href='/x86/([^']+)'>")
 
-sdm_url_prefix = 'https://www.felixcloutier.com/x86/'
+def collect_sdm_dict() -> Dict[str, str:]:
+    with urlopen(sdm_root_url) as sdm_root:
+        charsets = sdm_root.info().get_charsets()
+        sdm_top = sdm_root.read().decode(charsets[0])
+        matches = re_href.findall(sdm_top)
+        sdm_dict = dict()
+        for match in matches:
+            for name in match.split(':'):
+                sdm_dict[name] = match
+        return sdm_dict
 
-def input_sqlite_db(db_file: str) -> INST_DB:
+sql_query = 'SELECT DISTINCT iclass from Instructions;'
+
+def collect_iclasses(db_file: str) -> List[str]:
     with sqlite3.connect(db_file) as db:
         db.row_factory = sqlite3.Row
-        return db
-
-def collect_iclasses(db: INST_DB) -> List[str]:
-    sql_query = 'SELECT DISTINCT iclass from Instructions;'
-    insts = db.execute(sql_query)
-    return [ inst['iclass'] for inst in insts ]
+        insts = db.execute(sql_query)
+        return [ inst['iclass'] for inst in insts ]
 
 cond_codes = '(o|no|b|nb|z|nz|be|nbe|s|ns|p|np|l|nl|le|nle)'
 
@@ -34,17 +42,7 @@ re_cmovcc = re.compile(f'^cmov{cond_codes}$')
 re_lock = re.compile(r'^(?P<stem>.+)_lock$')
 re_rep = re.compile(r'^(rep|repe|repne)_(?P<stem>.+)$')
 
-def sdm_url_exists(name: str) -> bool:
-    sdm_url = sdm_url_prefix + name
-    print(f'Checking: {sdm_url}')
-    try:
-        urlopen(sdm_url)
-    except Exception:
-        return False
-    else:
-        return True
-
-def get_sdm_name(iclass: str) -> Optional[str]:
+def get_sdm_name(iclass: str, sdm_dict: Dict[str, str]) -> Optional[str]:
     iclass = iclass.lower()
     if re_jcc.match(iclass):
         return 'jcc'
@@ -58,30 +56,29 @@ def get_sdm_name(iclass: str) -> Optional[str]:
     m = re_rep.match(iclass)
     if m:
         iclass = m.group('stem')
-    if sdm_url_exists(iclass):
-        return iclass
-    if iclass.startswith('v'):
-        iclass = iclass[1:]
-        if sdm_url_exists(iclass):
-            return iclass
-    return None
+    return sdm_dict.get(iclass, None)
 
-def collect_sdm_urls(iclasses: List[str]) -> Dict[str, str]:
+def collect_sdm_urls(iclasses: List[str], sdm_dict: Dict[str, str]) -> Dict[str, str]:
     sdm_urls = dict()
+    cur_time = datetime.now(ZoneInfo('US/Pacific'))
+    sdm_urls['_COMMENT'] = f'generated at {cur_time}'
     for iclass in iclasses:
-        name = get_sdm_name(iclass)
+        name = get_sdm_name(iclass, sdm_dict)
         if name:
-            sdm_urls[iclass] = sdm_url_prefix + name
+            sdm_urls[iclass] = sdm_root_url + name
     return sdm_urls
 
+this_dir = Path(__file__).resolve().parent
+default_json = str(this_dir / 'sdm_urls.json')
+
 def main() -> None:
-    parser = ArgumentParser(description=f'Generate the mapping from iclasses to instruction reference URLs in {sdm_url_prefix}')
+    parser = ArgumentParser(description=f'Generate the mapping from iclasses to instruction reference URLs in {sdm_root_url}')
     parser.add_argument('sqlite', type=str, help='input SQLite database extracted from a XED build')
     parser.add_argument('--json', default=default_json, help=f'output JSON file (default: {default_json})')
     args = parser.parse_args()
-    db = input_sqlite_db(args.sqlite)
-    iclasses = collect_iclasses(db)
-    sdm_urls = collect_sdm_urls(iclasses)
+    sdm_dict = collect_sdm_dict()
+    iclasses = collect_iclasses(args.sqlite)
+    sdm_urls = collect_sdm_urls(iclasses, sdm_dict)
     with open(args.json, 'w') as json_fp:
         json.dump(sdm_urls, json_fp, indent=4)
 
