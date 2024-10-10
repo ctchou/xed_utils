@@ -62,10 +62,16 @@ def collect_sdm_urls(iclasses: List[str], sdm_dict: Dict[str, str]) -> Dict[str,
     sdm_urls = dict()
     cur_time = datetime.now(ZoneInfo('US/Pacific'))
     sdm_urls['_COMMENT'] = f'generated at {cur_time}'
+    missing = []
     for iclass in iclasses:
         name = get_sdm_name(iclass, sdm_dict)
         if name:
             sdm_urls[iclass] = sdm_root_url + name
+        else:
+            missing.append(iclass)
+    print('Missing iclasses:')
+    for iclass in sorted(missing):
+        print(iclass)
     return sdm_urls
 
 this_dir = Path(__file__).resolve().parent
