@@ -34,6 +34,16 @@ re_cmovcc = re.compile(f'^cmov{cond_codes}$')
 re_lock = re.compile(r'^(?P<stem>.+)_lock$')
 re_rep = re.compile(r'^(rep|repe|repne)_(?P<stem>.+)$')
 
+def sdm_url_exists(name: str) -> bool:
+    sdm_url = sdm_url_prefix + name
+    print(f'Checking: {sdm_url}')
+    try:
+        urlopen(sdm_url)
+    except Exception:
+        return False
+    else:
+        return True
+
 def get_sdm_name(iclass: str) -> Optional[str]:
     iclass = iclass.lower()
     if re_jcc.match(iclass):
@@ -48,8 +58,12 @@ def get_sdm_name(iclass: str) -> Optional[str]:
     m = re_rep.match(iclass)
     if m:
         iclass = m.group('stem')
-
-
+    if sdm_url_exists(iclass):
+        return iclass
+    if iclass.startswith('v'):
+        iclass = iclass[1:]
+        if sdm_url_exists(iclass):
+            return iclass
     return None
 
 def collect_sdm_urls(iclasses: List[str]) -> Dict[str, str]:
