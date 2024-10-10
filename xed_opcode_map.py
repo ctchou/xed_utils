@@ -2,28 +2,41 @@
 
 import sqlite3
 from argparse import ArgumentParser
-from typing import Any, List, Tuple, Dict, Optional
+from typing import List, Optional
 
 INST_DB = sqlite3.Connection
 
-def sql_query(map_id: int, opcode: int) -> str:
+def sql_query(map_id: int, opcode: int, iclass: Optional[str] = None) -> str:
+    if iclass:
+        iclass_cond = f'iclass = {iclass}'
+        more_attrs = ', space, pp'
+    else:
+        iclass_cond = 'TRUE'
+        more_attrs = ''
     return f'''
-        SELECT DISTINCT iclass, space, pp
+        SELECT DISTINCT iclass {more_attrs}
         FROM Instructions
         WHERE map == {map_id}
         AND ( opcode_int == {opcode} OR
-              (partial_opcode == 1 AND {opcode} BETWEEN opcode_int AND opcode_int + 7) );
+              (partial_opcode == 1 AND {opcode} BETWEEN opcode_int AND opcode_int + 7) )
+        AND {iclass_cond};
 '''
 
-def get_insts(db: INST_DB, map_id: int, opcode: int) -> List[str]:
-    rows = db.execute(sql_query(map_id, opcode))
+# def pprint_inst(inst: sqlite3.Row) -> str:
+#     iclass = inst['iclass']
+#     space = inst['space'].upper()
+#     pp = inst['pp'].replace(' ', '/')
+#     return f'{iclass} {space}:{pp}'
 
-    return [ row['iclass'] for row in rows ]
+def collect_insts(db: INST_DB, map_id: int, opcode: int) -> List[str]:
+    insts = db.execute(sql_query(map_id, opcode))
+    iclasses = [ inst['iclass'] for inst in insts ]
+    return iclasses
 
 def html_cell(db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
     opc_int = 16 * row_id + col_id
     opc_hex = f'{opc_int:02X}'
-    opc_insts = '<br>\n&emsp;'.join(get_insts(db, map_id, opc_int))
+    opc_insts = '<br>\n&emsp;'.join(collect_insts(db, map_id, opc_int))
     return f'''
 <td>
 <b style="font-size: 120%">{opc_hex}</b><br>
