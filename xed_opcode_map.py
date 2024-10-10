@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import json
 import sqlite3
+from pathlib import Path
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 INST_DB = sqlite3.Connection
 
@@ -33,10 +35,19 @@ def collect_insts(db: INST_DB, map_id: int, opcode: int) -> List[str]:
     iclasses = [ inst['iclass'] for inst in insts ]
     return iclasses
 
-def html_cell(db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
+def html_cell(sdm_urls: Dict[str, str], db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
     opc_int = 16 * row_id + col_id
     opc_hex = f'{opc_int:02X}'
-    opc_insts = '<br>\n&emsp;'.join(collect_insts(db, map_id, opc_int))
+    opc_iclasses = collect_insts(db, map_id, opc_int)
+    opc_insts = []
+    for iclass in opc_iclasses:
+        url = sdm_urls.get(iclass, None)
+        if url:
+            opc_insts.append(f'<a href="{url}" target="_blank">{iclass}</a>')
+        else:
+#            opc_insts.append(f'<a href="{url}">{iclass}</a>')
+            opc_insts.append(f'{iclass}')
+    opc_insts = '<br>\n&emsp;'.join(opc_insts)
     return f'''
 <td>
 <b style="font-size: 120%">{opc_hex}</b><br>
@@ -44,16 +55,16 @@ def html_cell(db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
 </td>
 '''
 
-def html_row(db: INST_DB, map_id: int, row_id: int) -> str:
-    all_cols = '\n'.join([ html_cell(db, map_id, row_id, col_id) for col_id in range(16) ])
+def html_row(sdm_urls: Dict[str, str], db: INST_DB, map_id: int, row_id: int) -> str:
+    all_cols = '\n'.join([ html_cell(sdm_urls, db, map_id, row_id, col_id) for col_id in range(16) ])
     return f'''
 <tr>
 {all_cols}
 </tr>
 '''
 
-def html_map(db: INST_DB, map_id: int) -> str:
-    all_rows = '\n'.join([ html_row(db, map_id, row_id) for row_id in range(16) ])
+def html_map(sdm_urls: Dict[str, str], db: INST_DB, map_id: int) -> str:
+    all_rows = '\n'.join([ html_row(sdm_urls, db, map_id, row_id) for row_id in range(16) ])
     return f'''
 <button class="collapsible">Map {map_id}</button>
 <div class="content">
@@ -65,8 +76,8 @@ def html_map(db: INST_DB, map_id: int) -> str:
 </div>
 '''
 
-def html_final(db: INST_DB) -> str:
-    all_maps = '\n'.join([ html_map(db, map_id) for map_id in range(8) ])
+def html_final(sdm_urls: Dict[str, str], db: INST_DB) -> str:
+    all_maps = '\n'.join([ html_map(sdm_urls, db, map_id) for map_id in range(8) ])
     return f'''
 <!DOCTYPE html>
 <html>
@@ -151,22 +162,28 @@ for (i = 0; i < coll.length; i++) {{
 </html>
 '''
 
+def input_sdm_urls() -> Dict[str, str]:
+    this_dir = Path(__file__).resolve().parent
+    with open(this_dir / 'sdm_urls.json', 'r') as json_fp:
+        return json.load(json_fp)
+
 def input_sqlite_db(db_file: str) -> INST_DB:
     with sqlite3.connect(db_file) as db:
         db.row_factory = sqlite3.Row
         return db
 
-def output_opcode_map(db: INST_DB, out_file: str) -> None:
+def output_opcode_map(sdm_urls: Dict[str, str], db: INST_DB, out_file: str) -> None:
     with open(out_file, 'w') as out_fp:
-        out_fp.write(html_final(db))
+        out_fp.write(html_final(sdm_urls, db))
 
 def main() -> None:
     parser = ArgumentParser(description='Make HTML opcopde map from SQLite database extracted from a XED build')
-    parser.add_argument('sqlite', type=str, help='input SQLite database')
+    parser.add_argument('sqlite', type=str, help='input SQLite database extracted from a XED build')
     parser.add_argument('html', type=str, help='output HTML opcode map')
     args = parser.parse_args()
+    sdm_urls = input_sdm_urls()
     db = input_sqlite_db(args.sqlite)
-    output_opcode_map(db, args.html)
+    output_opcode_map(sdm_urls, db, args.html)
 
 if __name__ == '__main__':
     main()
