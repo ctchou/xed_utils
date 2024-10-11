@@ -4,80 +4,58 @@ import json
 import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-INST_DB = sqlite3.Connection
+Iclass = str
+IclassDesc = List[sqlite3.Row]
+OpcodeMapCell = Dict[Iclass, IclassDesc]
+OneOpcodeMap = List[OpcodeMapCell]
+AllOpcodeMaps = List[OneOpcodeMap]
+SdmUrls = Dict[Iclass, str]
 
-def sql_query(map_id: int, opcode: int, iclass: Optional[str] = None) -> str:
-    if iclass:
-        iclass_cond = f'iclass = {iclass}'
-        more_attrs = ', space, pp'
-    else:
-        iclass_cond = 'TRUE'
-        more_attrs = ''
-    return f'''
-        SELECT DISTINCT iclass {more_attrs}
-        FROM Instructions
-        WHERE map == {map_id}
-        AND ( opcode_int == {opcode} OR
-              (partial_opcode == 1 AND {opcode} BETWEEN opcode_int AND opcode_int + 7) )
-        AND {iclass_cond};
-'''
+num_maps = 11
 
-# def pprint_inst(inst: sqlite3.Row) -> str:
-#     iclass = inst['iclass']
-#     space = inst['space'].upper()
-#     pp = inst['pp'].replace(' ', '/')
-#     return f'{iclass} {space}:{pp}'
-
-def collect_insts(db: INST_DB, map_id: int, opcode: int) -> List[str]:
-    insts = db.execute(sql_query(map_id, opcode))
-    iclasses = [ inst['iclass'] for inst in insts ]
-    return iclasses
-
-def html_cell(sdm_urls: Dict[str, str], db: INST_DB, map_id: int, row_id: int, col_id: int) -> str:
-    opc_int = 16 * row_id + col_id
-    opc_hex = f'{opc_int:02X}'
-    opc_iclasses = collect_insts(db, map_id, opc_int)
-    opc_insts = []
-    for iclass in opc_iclasses:
+def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
+    opcode_hex = f'{opcode:02X}'
+    iclasses = sorted(all_maps[map_id][opcode].keys())
+    insts = []
+    for iclass in iclasses:
         url = sdm_urls.get(iclass, None)
         if url:
-            opc_insts.append(f'<a href="{url}" target="_blank">{iclass}</a>')
+            insts.append(f'<a href="{url}" target="_blank">{iclass}</a>')
         else:
-#            opc_insts.append(f'<a href="{url}">{iclass}</a>')
-            opc_insts.append(f'{iclass}')
-    opc_insts = '<br>\n&emsp;'.join(opc_insts)
+            insts.append(f'{iclass}')
+    insts_html = '<br>\n&emsp;'.join(insts)
     return f'''
 <td>
-<b style="font-size: 120%">{opc_hex}</b><br>
-&emsp;{opc_insts}
+<b style="font-size: 120%">{opcode_hex}</b><br>
+&emsp;{insts_html}
 </td>
 '''
 
-def html_row(sdm_urls: Dict[str, str], db: INST_DB, map_id: int, row_id: int) -> str:
-    all_cols = '\n'.join([ html_cell(sdm_urls, db, map_id, row_id, col_id) for col_id in range(16) ])
+def html_row(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, row_id: int) -> str:
+    all_cols_html = '\n'.join([ html_cell(sdm_urls, all_maps, map_id, 16 * row_id + col_id) for col_id in range(16) ])
     return f'''
 <tr>
-{all_cols}
+{all_cols_html}
 </tr>
 '''
 
-def html_map(sdm_urls: Dict[str, str], db: INST_DB, map_id: int) -> str:
-    all_rows = '\n'.join([ html_row(sdm_urls, db, map_id, row_id) for row_id in range(16) ])
+def html_one_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int) -> str:
+    all_rows_html = '\n'.join([ html_row(sdm_urls, all_maps, map_id, row_id) for row_id in range(16) ])
     return f'''
 <button class="collapsible">Map {map_id}</button>
 <div class="content">
 <br>
 <table style="width:100%">
-{all_rows}
+{all_rows_html}
 </table>
 <br>
 </div>
 '''
 
-def html_final(sdm_urls: Dict[str, str], db: INST_DB) -> str:
-    all_maps = '\n'.join([ html_map(sdm_urls, db, map_id) for map_id in range(8) ])
+def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps) -> str:
+    all_maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id) for map_id in range(num_maps) ])
     return f'''
 <!DOCTYPE html>
 <html>
@@ -140,7 +118,7 @@ x86 opcode map
   <p>Legend here</p>
 </div>
 
-{all_maps}
+{all_maps_html}
 
 <script>
 var coll = document.getElementsByClassName("collapsible");
@@ -162,28 +140,56 @@ for (i = 0; i < coll.length; i++) {{
 </html>
 '''
 
-def input_sdm_urls() -> Dict[str, str]:
-    this_dir = Path(__file__).resolve().parent
-    with open(this_dir / 'sdm_urls.json', 'r') as json_fp:
-        return json.load(json_fp)
+def input_sdm_urls(sdm_urls_json) -> SdmUrls:
+    with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
+        return json.load(sdm_urls_json_fp)
 
-def input_sqlite_db(db_file: str) -> INST_DB:
+sql_query = '''
+    SELECT DISTINCT * from Instructions
+    order by map, opcode_int, iclass;
+'''
+
+def input_sqlite_db(db_file: str) -> sqlite3.Cursor:
     with sqlite3.connect(db_file) as db:
         db.row_factory = sqlite3.Row
-        return db
+        insts = db.execute(sql_query)
+        return insts
 
-def output_opcode_map(sdm_urls: Dict[str, str], db: INST_DB, out_file: str) -> None:
+def make_opcode_map(db: sqlite3.Cursor) -> AllOpcodeMaps:
+    all_maps = [ [ dict([]) for opcode in range(256) ] for map_id in range(num_maps) ]
+    for inst in db:
+        map_id = inst['map']
+        opcode = inst['opcode_int']
+        iclass = inst['iclass']
+        if inst['partial_opcode']:
+            for i in range(8):
+                iclass_desc = all_maps[map_id][opcode + i].get(iclass, [])
+                iclass_desc.append(inst)
+                all_maps[map_id][opcode + i][iclass] = iclass_desc
+        else:
+            iclass_desc = all_maps[map_id][opcode].get(iclass, [])
+            iclass_desc.append(inst)
+            all_maps[map_id][opcode][iclass] = iclass_desc
+    return all_maps
+
+def output_opcode_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, out_file: str) -> None:
     with open(out_file, 'w') as out_fp:
-        out_fp.write(html_final(sdm_urls, db))
+        out_fp.write(html_all_maps(sdm_urls, all_maps))
+
+this_dir = Path(__file__).resolve().parent
+default_sdm_urls_json = str(this_dir / 'sdm_urls.json')
 
 def main() -> None:
     parser = ArgumentParser(description='Make HTML opcopde map from SQLite database extracted from a XED build')
-    parser.add_argument('sqlite', type=str, help='input SQLite database extracted from a XED build')
-    parser.add_argument('html', type=str, help='output HTML opcode map')
+    parser.add_argument('xed_sqlite', type=str, help='input SQLite database extracted from a XED build')
+    parser.add_argument('opcmap_html', type=str, help='output HTML opcode map')
+    parser.add_argument('--sdm-urls-json', default=default_sdm_urls_json,
+                        help=f'input JSON file containing SDM instruction reference URLs (default: {default_sdm_urls_json})')
     args = parser.parse_args()
-    sdm_urls = input_sdm_urls()
-    db = input_sqlite_db(args.sqlite)
-    output_opcode_map(sdm_urls, db, args.html)
+    sdm_urls = input_sdm_urls(args.sdm_urls_json)
+    xed_db = input_sqlite_db(args.xed_sqlite)
+    all_maps = make_opcode_map(xed_db)
+    output_opcode_map(sdm_urls, all_maps, args.opcmap_html)
 
 if __name__ == '__main__':
     main()
