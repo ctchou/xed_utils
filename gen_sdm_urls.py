@@ -26,12 +26,7 @@ def collect_sdm_dict() -> Dict[str, str:]:
         return sdm_dict
 
 sql_query = '''
-    SELECT DISTINCT iclass from Instructions
-    WHERE extension NOT LIKE '3DNOW%'
-    AND extension NOT LIKE 'XOP%'
-    AND extension NOT LIKE 'TBM%'
-    AND extension NOT LIKE 'FMA4%'
-    AND extension NOT LIKE 'VIA_%';
+    SELECT DISTINCT iclass from Instructions;
 '''
 
 def collect_iclasses(db_file: str) -> List[str]:
@@ -90,13 +85,13 @@ def get_sdm_name(iclass: str, sdm_dict: Dict[str, str]) -> Optional[str]:
         return m.group('stem')
     m = re_strip_prefix.match(iclass)
     if m:
-        return m.group('stem')
+        iclass = m.group('stem')
     m = re_strip_suffix.match(iclass)
     if m:
-        return m.group('stem')
+        iclass = m.group('stem')
     m = re_strip_64.match(iclass)
     if m:
-        return m.group('stem')
+        iclass = m.group('stem')
     name = misc_dict.get(iclass, None)
     if name:
         return name
