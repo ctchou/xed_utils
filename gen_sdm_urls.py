@@ -6,8 +6,7 @@ import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
 from urllib.request import urlopen
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 from typing import Dict, List, Optional
 
 sdm_root_url = 'https://www.felixcloutier.com/x86/'
@@ -104,8 +103,8 @@ def get_sdm_name(iclass: str, sdm_dict: Dict[str, str]) -> Optional[str]:
 
 def collect_sdm_urls(iclasses: List[str], sdm_dict: Dict[str, str]) -> Dict[str, str]:
     sdm_urls = dict()
-    cur_time = datetime.now(ZoneInfo('US/Pacific'))
-    sdm_urls['_COMMENT'] = f'generated at {cur_time}'
+    cur_date = date.today()
+    sdm_urls['_COMMENT'] = f'generated on {cur_date}'
     missing = []
     for iclass in iclasses:
         name = get_sdm_name(iclass, sdm_dict)
@@ -119,18 +118,18 @@ def collect_sdm_urls(iclasses: List[str], sdm_dict: Dict[str, str]) -> Dict[str,
     return sdm_urls
 
 this_dir = Path(__file__).resolve().parent
-default_json = str(this_dir / 'sdm_urls.json')
+default_sdm_urls_json = str(this_dir / 'sdm_urls.json')
 
 def main() -> None:
-    parser = ArgumentParser(description=f'Generate the mapping from iclasses to instruction reference URLs in {sdm_root_url}')
+    parser = ArgumentParser(description=f'Generate the mapping from iclasses to SDM instruction reference URLs in {sdm_root_url}')
     parser.add_argument('sqlite', type=str, help='input SQLite database extracted from a XED build')
-    parser.add_argument('--json', default=default_json, help=f'output JSON file (default: {default_json})')
+    parser.add_argument('--sdm-urls-json', default=default_sdm_urls_json, help=f'output JSON file (default: {default_sdm_urls_json})')
     args = parser.parse_args()
     sdm_dict = collect_sdm_dict()
     iclasses = collect_iclasses(args.sqlite)
     sdm_urls = collect_sdm_urls(iclasses, sdm_dict)
-    with open(args.json, 'w') as json_fp:
-        json.dump(sdm_urls, json_fp, indent=4)
+    with open(args.sdm_urls_json, 'w') as sdm_urls_json_fp:
+        json.dump(sdm_urls, sdm_urls_json_fp, indent=4)
 
 if __name__ == '__main__':
     main()
