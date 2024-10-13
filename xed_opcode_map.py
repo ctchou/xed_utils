@@ -5,6 +5,15 @@ import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
 
+max_num_maps = 11
+
+Iclass = str
+IclassDesc = list[sqlite3.Row]
+OpcodeMapCell = dict[Iclass, IclassDesc]
+OneOpcodeMap = list[OpcodeMapCell]
+AllOpcodeMaps = list[OneOpcodeMap]
+SdmUrls = dict[Iclass, str]
+
 def html_final(maps_html: str, modals_js: str) -> str:
     return f'''
 <!DOCTYPE html>
@@ -133,6 +142,15 @@ for (i = 0; i < coll.length; i++) {{
 </html>
 '''
 
+def make_modal_id(map_id: int, opcode: int, iclass: str):
+    return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
+
+def html_modal_button(modal_id: str, iclass: str, url: str | None) -> str:
+    if url:
+        return f'<div id="modal_button_{modal_id}">&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>'
+    else:
+        return f'<div id="modal_button_{modal_id}">&emsp;{iclass}</div>'
+
 def html_modal_popup(modal_id: str) -> str:
     return f'''
 <div id="modal_popup_{modal_id}" class="modal">
@@ -157,30 +175,16 @@ modal_close_{modal_id}.onclick = function() {{
 }}
 '''
 
-Iclass = str
-IclassDesc = list[sqlite3.Row]
-OpcodeMapCell = dict[Iclass, IclassDesc]
-OneOpcodeMap = list[OpcodeMapCell]
-AllOpcodeMaps = list[OneOpcodeMap]
-SdmUrls = dict[Iclass, str]
-
-max_num_maps = 11
-
-def make_modal_id(map_id: int, opcode: int, iclass: str):
-    return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
-
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
     iclasses = sorted(all_maps[map_id][opcode].keys())
     insts = []
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
-        modal_popup = html_modal_popup(modal_id)
         url = sdm_urls.get(iclass, None)
-        if url:
-            insts.append(f'<div id="modal_button_{modal_id}">&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>{modal_popup}')
-        else:
-            insts.append(f'<div id="modal_button_{modal_id}">&emsp;{iclass}</div>{modal_popup}')
+        modal_button = html_modal_button(modal_id, iclass, url)
+        modal_popup = html_modal_popup(modal_id)
+        insts.append('\n'.join([modal_button, modal_popup]))
     insts_html = '\n'.join(insts)
     return f'''
 <td>
