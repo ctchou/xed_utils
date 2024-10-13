@@ -133,11 +133,28 @@ for (i = 0; i < coll.length; i++) {{
 </html>
 '''
 
+def html_modal_popup(modal_id: str) -> str:
+    return f'''
+<div id="modal_popup_{modal_id}" class="modal">
+  <div class="modal-content">
+    <span id="modal_close_{modal_id}" class="close">&times;</span>
+    <p>{modal_id}</p>
+  </div>
+</div>
+'''
+
 def html_modal_js(modal_id: str) -> str:
     return f'''
 var modal_button_{modal_id} = document.getElementById("modal_button_{modal_id}");
 var modal_popup_{modal_id} = document.getElementById("modal_popup_{modal_id}");
+var modal_close_{modal_id} = document.getElementById("modal_close_{modal_id}");
 
+modal_button_{modal_id}.onclick = function() {{
+  modal_popup_{modal_id}.style.display = "block";
+}}
+modal_close_{modal_id}.onclick = function() {{
+  modal_popup_{modal_id}.style.display = "none";
+}}
 '''
 
 Iclass = str
@@ -149,16 +166,21 @@ SdmUrls = dict[Iclass, str]
 
 max_num_maps = 11
 
+def make_modal_id(map_id: int, opcode: int, iclass: str):
+    return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
+
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
     iclasses = sorted(all_maps[map_id][opcode].keys())
     insts = []
     for iclass in iclasses:
+        modal_id = make_modal_id(map_id, opcode, iclass)
+        modal_popup = html_modal_popup(modal_id)
         url = sdm_urls.get(iclass, None)
         if url:
-            insts.append(f'<div>&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>')
+            insts.append(f'<div id="modal_button_{modal_id}">&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>{modal_popup}')
         else:
-            insts.append(f'<div>&emsp;{iclass}</div>')
+            insts.append(f'<div id="modal_button_{modal_id}">&emsp;{iclass}</div>{modal_popup}')
     insts_html = '\n'.join(insts)
     return f'''
 <td>
@@ -197,15 +219,15 @@ def collect_maps_info(all_maps: AllOpcodeMaps) -> tuple[list[bool], list[str]]:
                 iclass_size = len(all_maps[map_id][opcode][iclass])
                 assert iclass_size > 0
                 empty_maps[map_id] = False
-                modal_ids += [ f'map_{map_id}_opc_{opcode:02X}_{iclass}_{i}' for i in range(iclass_size) ]
+                modal_ids.append(make_modal_id(map_id, opcode, iclass))
     return (empty_maps, modal_ids)
 
 def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps) -> str:
     empty_maps, modal_ids = collect_maps_info(all_maps)
-
     maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
                                for map_id in range(max_num_maps) if not empty_maps[map_id] ])
-    return html_final(maps_html, '')
+    modals_js = '\n'.join([ html_modal_js(modal_id) for modal_id in modal_ids ])
+    return html_final(maps_html, modals_js)
 
 def input_sdm_urls(sdm_urls_json) -> SdmUrls:
     with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
