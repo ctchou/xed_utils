@@ -4,60 +4,8 @@ import json
 import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
-from typing import Dict, List, Tuple
 
-Iclass = str
-IclassDesc = List[sqlite3.Row]
-OpcodeMapCell = Dict[Iclass, IclassDesc]
-OneOpcodeMap = List[OpcodeMapCell]
-AllOpcodeMaps = List[OneOpcodeMap]
-EmptyMaps = List[bool]
-SdmUrls = Dict[Iclass, str]
-
-max_num_maps = 11
-
-def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
-    opcode_hex = f'{opcode:02X}'
-    iclasses = sorted(all_maps[map_id][opcode].keys())
-    insts = []
-    for iclass in iclasses:
-        url = sdm_urls.get(iclass, None)
-        if url:
-            insts.append(f'<div>&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>')
-        else:
-            insts.append(f'<div>&emsp;{iclass}</div>')
-    insts_html = '\n'.join(insts)
-    return f'''
-<td>
-<b style="font-size: 120%">{opcode_hex}</b>
-{insts_html}
-</td>
-'''
-
-def html_row(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, row_id: int) -> str:
-    all_cols_html = '\n'.join([ html_cell(sdm_urls, all_maps, map_id, 16 * row_id + col_id) for col_id in range(16) ])
-    return f'''
-<tr>
-{all_cols_html}
-</tr>
-'''
-
-def html_one_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int) -> str:
-    all_rows_html = '\n'.join([ html_row(sdm_urls, all_maps, map_id, row_id) for row_id in range(16) ])
-    return f'''
-<button class="collapsible">Map {map_id}</button>
-<div class="content">
-<br>
-<table style="width:100%">
-{all_rows_html}
-</table>
-<br>
-</div>
-'''
-
-def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, empty_maps: EmptyMaps) -> str:
-    all_maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
-                               for map_id in range(max_num_maps) if not empty_maps[map_id] ])
+def html_template(all_maps_html: str) -> str:
     return f'''
 <!DOCTYPE html>
 <html>
@@ -181,6 +129,60 @@ for (i = 0; i < coll.length; i++) {{
 </html>
 '''
 
+Iclass = str
+IclassDesc = list[sqlite3.Row]
+OpcodeMapCell = dict[Iclass, IclassDesc]
+OneOpcodeMap = list[OpcodeMapCell]
+AllOpcodeMaps = list[OneOpcodeMap]
+EmptyMaps = list[bool]
+SdmUrls = dict[Iclass, str]
+
+max_num_maps = 11
+
+def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
+    opcode_hex = f'{opcode:02X}'
+    iclasses = sorted(all_maps[map_id][opcode].keys())
+    insts = []
+    for iclass in iclasses:
+        url = sdm_urls.get(iclass, None)
+        if url:
+            insts.append(f'<div>&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>')
+        else:
+            insts.append(f'<div>&emsp;{iclass}</div>')
+    insts_html = '\n'.join(insts)
+    return f'''
+<td>
+<b style="font-size: 120%">{opcode_hex}</b>
+{insts_html}
+</td>
+'''
+
+def html_row(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, row_id: int) -> str:
+    all_cols_html = '\n'.join([ html_cell(sdm_urls, all_maps, map_id, 16 * row_id + col_id) for col_id in range(16) ])
+    return f'''
+<tr>
+{all_cols_html}
+</tr>
+'''
+
+def html_one_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int) -> str:
+    all_rows_html = '\n'.join([ html_row(sdm_urls, all_maps, map_id, row_id) for row_id in range(16) ])
+    return f'''
+<button class="collapsible">Map {map_id}</button>
+<div class="content">
+<br>
+<table style="width:100%">
+{all_rows_html}
+</table>
+<br>
+</div>
+'''
+
+def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, empty_maps: EmptyMaps) -> str:
+    all_maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
+                               for map_id in range(max_num_maps) if not empty_maps[map_id] ])
+    return html_template(all_maps_html)
+
 def input_sdm_urls(sdm_urls_json) -> SdmUrls:
     with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
         return json.load(sdm_urls_json_fp)
@@ -196,7 +198,7 @@ def input_sqlite_db(db_file: str) -> sqlite3.Cursor:
         insts = db.execute(sql_query)
         return insts
 
-def collect_all_maps(db: sqlite3.Cursor) -> Tuple[AllOpcodeMaps, EmptyMaps]:
+def collect_all_maps(db: sqlite3.Cursor) -> tuple[AllOpcodeMaps, EmptyMaps]:
     all_maps = [ [ dict([]) for opcode in range(256) ] for map_id in range(max_num_maps) ]
     empty_maps = [ True for map_id in range(max_num_maps) ]
     for inst in db:
