@@ -22,14 +22,14 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
     for iclass in iclasses:
         url = sdm_urls.get(iclass, None)
         if url:
-            insts.append(f'<a href="{url}" target="_blank">{iclass}</a>')
+            insts.append(f'<div>&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>')
         else:
-            insts.append(f'{iclass}')
-    insts_html = '<br>\n&emsp;'.join(insts)
+            insts.append(f'<div>&emsp;{iclass}</div>')
+    insts_html = '\n'.join(insts)
     return f'''
 <td>
-<b style="font-size: 120%">{opcode_hex}</b><br>
-&emsp;{insts_html}
+<b style="font-size: 120%">{opcode_hex}</b>
+{insts_html}
 </td>
 '''
 
