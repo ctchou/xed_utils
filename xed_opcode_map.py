@@ -8,8 +8,8 @@ from argparse import ArgumentParser
 max_num_maps = 11
 
 Iclass = str
-IclassDesc = list[sqlite3.Row]
-OpcodeMapCell = dict[Iclass, IclassDesc]
+IclassDefs = list[sqlite3.Row]
+OpcodeMapCell = dict[Iclass, IclassDefs]
 OneOpcodeMap = list[OpcodeMapCell]
 AllOpcodeMaps = list[OneOpcodeMap]
 SdmUrls = dict[Iclass, str]
@@ -148,21 +148,19 @@ window.onclick = function(event) {{
 </html>
 '''
 
-def make_modal_id(map_id: int, opcode: int, iclass: str):
-    return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
-
 def html_modal_button(modal_id: str, iclass: str, url: str | None) -> str:
     if url:
         return f'<div id="modal_button_{modal_id}">&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>'
     else:
         return f'<div id="modal_button_{modal_id}">&emsp;{iclass}</div>'
 
-def html_modal_popup(modal_id: str) -> str:
+def html_modal_popup(modal_id: str, inst_strs: list[str]) -> str:
+    all_inst_strs = '\n    '.join(inst_strs)
     return f'''
 <div id="modal_popup_{modal_id}" class="modal">
   <div class="modal-content">
     <span id="modal_close_{modal_id}" class="close">&times;</span>
-    <p>{modal_id}</p>
+    {all_inst_strs}
   </div>
 </div>
 '''
@@ -188,21 +186,31 @@ def js_modal_exit(modal_id: str) -> str:
       break;
 '''
 
+def make_modal_id(map_id: int, opcode: int, iclass: str):
+    return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
+
+def make_inst_str(inst: sqlite3.Row) -> str:
+    iform = inst['iform']
+    opcode = inst['opcode_hex']
+    return f'<div>{iform} {opcode}</div>'
+
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
     iclasses = sorted(all_maps[map_id][opcode].keys())
-    insts = []
+    cell_info = []
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
         url = sdm_urls.get(iclass, None)
         modal_button = html_modal_button(modal_id, iclass, url)
-        modal_popup = html_modal_popup(modal_id)
-        insts.append('\n'.join([modal_button, modal_popup]))
-    insts_html = '\n'.join(insts)
+        inst_defs = all_maps[map_id][opcode][iclass]
+        inst_strs = [ make_inst_str(inst) for inst in inst_defs ]
+        modal_popup = html_modal_popup(modal_id, inst_strs)
+        cell_info.append('\n'.join([modal_button, modal_popup]))
+    cell_info_html = '\n'.join(cell_info)
     return f'''
 <td>
 <b style="font-size: 120%">{opcode_hex}</b>
-{insts_html}
+{cell_info_html}
 </td>
 '''
 
@@ -270,13 +278,13 @@ def collect_all_maps(db: sqlite3.Cursor) -> AllOpcodeMaps:
         iclass = inst['iclass']
         if inst['partial_opcode']:
             for i in range(8):
-                iclass_desc = all_maps[map_id][opcode + i].get(iclass, [])
-                iclass_desc.append(inst)
-                all_maps[map_id][opcode + i][iclass] = iclass_desc
+                iclass_defs = all_maps[map_id][opcode + i].get(iclass, [])
+                iclass_defs.append(inst)
+                all_maps[map_id][opcode + i][iclass] = iclass_defs
         else:
-            iclass_desc = all_maps[map_id][opcode].get(iclass, [])
-            iclass_desc.append(inst)
-            all_maps[map_id][opcode][iclass] = iclass_desc
+            iclass_defs = all_maps[map_id][opcode].get(iclass, [])
+            iclass_defs.append(inst)
+            all_maps[map_id][opcode][iclass] = iclass_defs
     return all_maps
 
 def output_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, out_file: str) -> None:
