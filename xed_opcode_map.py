@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
 
-def html_template(all_maps_html: str) -> str:
+def html_final(maps_html: str, modals_js: str) -> str:
     return f'''
 <!DOCTYPE html>
 <html>
@@ -107,9 +107,10 @@ x86 opcode map
   <p>Legend here</p>
 </div>
 
-{all_maps_html}
+{maps_html}
 
 <script>
+
 var coll = document.getElementsByClassName("collapsible");
 var i;
 for (i = 0; i < coll.length; i++) {{
@@ -123,10 +124,20 @@ for (i = 0; i < coll.length; i++) {{
     }} 
   }});
 }}
+
+{modals_js}
+
 </script>
 
 </body>
 </html>
+'''
+
+def html_modal_js(modal_id: str) -> str:
+    return f'''
+var modal_button_{modal_id} = document.getElementById("modal_button_{modal_id}");
+var modal_popup_{modal_id} = document.getElementById("modal_popup_{modal_id}");
+
 '''
 
 Iclass = str
@@ -134,7 +145,6 @@ IclassDesc = list[sqlite3.Row]
 OpcodeMapCell = dict[Iclass, IclassDesc]
 OneOpcodeMap = list[OpcodeMapCell]
 AllOpcodeMaps = list[OneOpcodeMap]
-EmptyMaps = list[bool]
 SdmUrls = dict[Iclass, str]
 
 max_num_maps = 11
@@ -178,10 +188,24 @@ def html_one_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int) -> str
 </div>
 '''
 
-def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, empty_maps: EmptyMaps) -> str:
-    all_maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
+def collect_maps_info(all_maps: AllOpcodeMaps) -> tuple[list[bool], list[str]]:
+    empty_maps = [ True for map_id in range(max_num_maps) ]
+    modal_ids = []
+    for map_id in range(max_num_maps):
+        for opcode in range(256):
+            for iclass in all_maps[map_id][opcode]:
+                iclass_size = len(all_maps[map_id][opcode][iclass])
+                assert iclass_size > 0
+                empty_maps[map_id] = False
+                modal_ids += [ f'map_{map_id}_opc_{opcode:02X}_{iclass}_{i}' for i in range(iclass_size) ]
+    return (empty_maps, modal_ids)
+
+def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps) -> str:
+    empty_maps, modal_ids = collect_maps_info(all_maps)
+
+    maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
                                for map_id in range(max_num_maps) if not empty_maps[map_id] ])
-    return html_template(all_maps_html)
+    return html_final(maps_html, '')
 
 def input_sdm_urls(sdm_urls_json) -> SdmUrls:
     with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
@@ -198,12 +222,10 @@ def input_sqlite_db(db_file: str) -> sqlite3.Cursor:
         insts = db.execute(sql_query)
         return insts
 
-def collect_all_maps(db: sqlite3.Cursor) -> tuple[AllOpcodeMaps, EmptyMaps]:
+def collect_all_maps(db: sqlite3.Cursor) -> AllOpcodeMaps:
     all_maps = [ [ dict([]) for opcode in range(256) ] for map_id in range(max_num_maps) ]
-    empty_maps = [ True for map_id in range(max_num_maps) ]
     for inst in db:
         map_id = inst['map']
-        empty_maps[map_id] = False
         opcode = inst['opcode_int']
         iclass = inst['iclass']
         if inst['partial_opcode']:
@@ -215,11 +237,11 @@ def collect_all_maps(db: sqlite3.Cursor) -> tuple[AllOpcodeMaps, EmptyMaps]:
             iclass_desc = all_maps[map_id][opcode].get(iclass, [])
             iclass_desc.append(inst)
             all_maps[map_id][opcode][iclass] = iclass_desc
-    return (all_maps, empty_maps)
+    return all_maps
 
-def output_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, empty_maps: EmptyMaps, out_file: str) -> None:
+def output_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, out_file: str) -> None:
     with open(out_file, 'w') as out_fp:
-        out_fp.write(html_all_maps(sdm_urls, all_maps, empty_maps))
+        out_fp.write(html_all_maps(sdm_urls, all_maps))
 
 this_dir = Path(__file__).resolve().parent
 default_sdm_urls_json = str(this_dir / 'sdm_urls.json')
@@ -233,8 +255,8 @@ def main() -> None:
     args = parser.parse_args()
     sdm_urls = input_sdm_urls(args.sdm_urls_json)
     xed_db = input_sqlite_db(args.xed_sqlite)
-    all_maps, empty_maps = collect_all_maps(xed_db)
-    output_all_maps(sdm_urls, all_maps, empty_maps, args.opcmap_html)
+    all_maps = collect_all_maps(xed_db)
+    output_all_maps(sdm_urls, all_maps, args.opcmap_html)
 
 if __name__ == '__main__':
     main()
