@@ -14,7 +14,7 @@ OneOpcodeMap = list[OpcodeMapCell]
 AllOpcodeMaps = list[OneOpcodeMap]
 SdmUrls = dict[Iclass, str]
 
-def html_final(maps_html: str, modals_js: str) -> str:
+def html_final(maps_html: str, modals_click_js: str, modals_exit_js) -> str:
     return f'''
 <!DOCTYPE html>
 <html>
@@ -134,7 +134,13 @@ for (i = 0; i < coll.length; i++) {{
   }});
 }}
 
-{modals_js}
+{modals_click_js}
+
+window.onclick = function(event) {{
+  switch (event.target) {{
+    {modals_exit_js}
+  }}
+}}
 
 </script>
 
@@ -161,7 +167,7 @@ def html_modal_popup(modal_id: str) -> str:
 </div>
 '''
 
-def html_modal_js(modal_id: str) -> str:
+def js_modal_click(modal_id: str) -> str:
     return f'''
 var modal_button_{modal_id} = document.getElementById("modal_button_{modal_id}");
 var modal_popup_{modal_id} = document.getElementById("modal_popup_{modal_id}");
@@ -173,6 +179,13 @@ modal_button_{modal_id}.onclick = function() {{
 modal_close_{modal_id}.onclick = function() {{
   modal_popup_{modal_id}.style.display = "none";
 }}
+'''
+
+def js_modal_exit(modal_id: str) -> str:
+    return f'''
+    case modal_popup_{modal_id}:
+      modal_popup_{modal_id}.style.display = "none";
+      break;
 '''
 
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
@@ -229,9 +242,10 @@ def collect_maps_info(all_maps: AllOpcodeMaps) -> tuple[list[bool], list[str]]:
 def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps) -> str:
     empty_maps, modal_ids = collect_maps_info(all_maps)
     maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
-                               for map_id in range(max_num_maps) if not empty_maps[map_id] ])
-    modals_js = '\n'.join([ html_modal_js(modal_id) for modal_id in modal_ids ])
-    return html_final(maps_html, modals_js)
+                            for map_id in range(max_num_maps) if not empty_maps[map_id] ])
+    modals_click_js = '\n'.join([ js_modal_click(modal_id) for modal_id in modal_ids ])
+    modals_exit_js = '\n'.join([ js_modal_exit(modal_id) for modal_id in modal_ids ])
+    return html_final(maps_html, modals_click_js, modals_exit_js)
 
 def input_sdm_urls(sdm_urls_json) -> SdmUrls:
     with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
