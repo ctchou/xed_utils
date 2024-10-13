@@ -149,10 +149,9 @@ window.onclick = function(event) {{
 '''
 
 def html_modal_button(modal_id: str, iclass: str, url: str | None) -> str:
-    if url:
-        return f'<div id="modal_button_{modal_id}">&emsp;{iclass} <sup><a href="{url}" target="_blank">*</a></sup></div>'
-    else:
-        return f'<div id="modal_button_{modal_id}">&emsp;{iclass}</div>'
+    button = f'<div style="display: inline" id="modal_button_{modal_id}">&emsp;{iclass}</div>'
+    sdm_link = f' <sup><a href="{url}" target="_blank">*</a></sup>' if url else ''
+    return button + sdm_link
 
 def html_modal_popup(modal_id: str, inst_strs: list[str]) -> str:
     all_inst_strs = '\n    '.join(inst_strs)
@@ -206,10 +205,10 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
         inst_strs = [ make_inst_str(inst) for inst in inst_defs ]
         modal_popup = html_modal_popup(modal_id, inst_strs)
         cell_info.append('\n'.join([modal_button, modal_popup]))
-    cell_info_html = '\n'.join(cell_info)
+    cell_info_html = '<br>\n'.join(cell_info)
     return f'''
 <td>
-<b style="font-size: 120%">{opcode_hex}</b>
+<b style="font-size: 120%">{opcode_hex}</b><br>
 {cell_info_html}
 </td>
 '''
