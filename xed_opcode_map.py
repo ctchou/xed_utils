@@ -4,16 +4,17 @@ import json
 import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 Iclass = str
 IclassDesc = List[sqlite3.Row]
 OpcodeMapCell = Dict[Iclass, IclassDesc]
 OneOpcodeMap = List[OpcodeMapCell]
 AllOpcodeMaps = List[OneOpcodeMap]
+EmptyMaps = List[bool]
 SdmUrls = Dict[Iclass, str]
 
-num_maps = 11
+max_num_maps = 11
 
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
@@ -54,8 +55,9 @@ def html_one_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int) -> str
 </div>
 '''
 
-def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps) -> str:
-    all_maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id) for map_id in range(num_maps) ])
+def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, empty_maps: EmptyMaps) -> str:
+    all_maps_html = '\n'.join([ html_one_map(sdm_urls, all_maps, map_id)
+                               for map_id in range(max_num_maps) if not empty_maps[map_id] ])
     return f'''
 <!DOCTYPE html>
 <html>
@@ -194,10 +196,12 @@ def input_sqlite_db(db_file: str) -> sqlite3.Cursor:
         insts = db.execute(sql_query)
         return insts
 
-def make_opcode_map(db: sqlite3.Cursor) -> AllOpcodeMaps:
-    all_maps = [ [ dict([]) for opcode in range(256) ] for map_id in range(num_maps) ]
+def collect_all_maps(db: sqlite3.Cursor) -> Tuple[AllOpcodeMaps, EmptyMaps]:
+    all_maps = [ [ dict([]) for opcode in range(256) ] for map_id in range(max_num_maps) ]
+    empty_maps = [ True for map_id in range(max_num_maps) ]
     for inst in db:
         map_id = inst['map']
+        empty_maps[map_id] = False
         opcode = inst['opcode_int']
         iclass = inst['iclass']
         if inst['partial_opcode']:
@@ -209,11 +213,11 @@ def make_opcode_map(db: sqlite3.Cursor) -> AllOpcodeMaps:
             iclass_desc = all_maps[map_id][opcode].get(iclass, [])
             iclass_desc.append(inst)
             all_maps[map_id][opcode][iclass] = iclass_desc
-    return all_maps
+    return (all_maps, empty_maps)
 
-def output_opcode_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, out_file: str) -> None:
+def output_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, empty_maps: EmptyMaps, out_file: str) -> None:
     with open(out_file, 'w') as out_fp:
-        out_fp.write(html_all_maps(sdm_urls, all_maps))
+        out_fp.write(html_all_maps(sdm_urls, all_maps, empty_maps))
 
 this_dir = Path(__file__).resolve().parent
 default_sdm_urls_json = str(this_dir / 'sdm_urls.json')
@@ -227,8 +231,8 @@ def main() -> None:
     args = parser.parse_args()
     sdm_urls = input_sdm_urls(args.sdm_urls_json)
     xed_db = input_sqlite_db(args.xed_sqlite)
-    all_maps = make_opcode_map(xed_db)
-    output_opcode_map(sdm_urls, all_maps, args.opcmap_html)
+    all_maps, empty_maps = collect_all_maps(xed_db)
+    output_all_maps(sdm_urls, all_maps, empty_maps, args.opcmap_html)
 
 if __name__ == '__main__':
     main()
