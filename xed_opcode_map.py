@@ -92,7 +92,7 @@ table, tr, td {{
   margin: auto;
   padding: 20px;
   border: 1px solid #888;
-  width: 80%;
+  width: 50%;
 }}
 
 /* The Close Button */
@@ -199,13 +199,40 @@ def js_modal_exit(modal_id: str) -> str:
 def make_modal_id(map_id: int, opcode: int, iclass: str):
     return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
 
+def make_mode_str(inst: InstDef) -> str:
+    mode = inst['mode_restriction']
+    if mode == 'not64':
+        return 'not-64b-mode '
+    if mode == 0:
+        return '16b-mode '
+    if mode == 1:
+        return '32b-mode '
+    if mode == 2:
+        return '64b-mode '
+    assert mode == 'unspecified'
+    return ''
+
 def make_prefix_str(inst: InstDef) -> str:
+    iclass = inst['iclass']
     space = inst['space'].upper()
     map = int(inst['map'])
     pp = inst['pp']
+    pattern = inst['pattern']
     if space == 'LEGACY':
-        pfx = f'{pp}: ' if pp != '' else ''
-        return pfx
+        if ' REX2=1' in pattern:
+            if iclass == 'JMPABS':
+                return 'REX2: '
+            elif iclass in ['PUSHP', 'POPP']:
+                return 'REX2-W1: '
+            elif iclass in ['PUSH', 'POP']:
+                return 'REX2-W0: '
+            else:
+                return ''
+        elif 'NOREX2=1' in pattern:
+            return 'NOREX2: '
+        else:
+            pfx = f'{pp}: ' if pp != '' else ''
+            return pfx
     else:
         return f'{space}-MAP{map}-{pp}: '
 
@@ -254,12 +281,13 @@ def make_disasm_str(inst: InstDef):
     return ' '.join(items)
 
 def make_inst_div(inst: InstDef) -> str:
+    mode_str = make_mode_str(inst)
     prefix_str = make_prefix_str(inst)
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
 
     iform = inst['iform']
-    return f'<div>{prefix_str}{opcode_str} {disasm_str} {iform}</div>'
+    return f'<div>{mode_str}{prefix_str}{opcode_str} {disasm_str} {iform}</div>'
 
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
