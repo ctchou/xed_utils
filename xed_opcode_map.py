@@ -193,10 +193,32 @@ def js_modal_exit(modal_id: str) -> str:
 def make_modal_id(map_id: int, opcode: int, iclass: str):
     return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
 
-def make_inst_str(inst: sqlite3.Row) -> str:
+def make_opcode_str(inst: sqlite3.Row) -> str:
+    opcode_hex = inst['opcode_hex']
+    partial_opcode = inst['partial_opcode']
+    mod_required = inst['mod_required']
+    reg_required = inst['reg_required']
+    if mod_required == 'unspecified':
+        if partial_opcode == 1:
+            opcode_ext = '+r'
+        else:
+            opcode_ext = ''
+    else:
+        if reg_required == 'unspecified':
+            opcode_ext = ' /r'
+        else:
+            assert int(reg_required) in range(8)
+            opcode_ext = f' /{reg_required}'
+
+
+    return f'{opcode_hex}{opcode_ext}'
+
+def make_inst_div(inst: sqlite3.Row) -> str:
+    opcode_str = make_opcode_str(inst)
+
+
     iform = inst['iform']
-    opcode = inst['opcode_hex']
-    return f'<div>{iform} {opcode}</div>'
+    return f'<div>{opcode_str} {iform}</div>'
 
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
@@ -207,8 +229,8 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
         url = sdm_urls.get(iclass, None)
         modal_button = html_modal_button(modal_id, iclass, url)
         inst_defs = all_maps[map_id][opcode][iclass]
-        inst_strs = [ make_inst_str(inst) for inst in inst_defs ]
-        modal_popup = html_modal_popup(modal_id, inst_strs)
+        inst_divs = [ make_inst_div(inst) for inst in inst_defs ]
+        modal_popup = html_modal_popup(modal_id, inst_divs)
         cell_info.append('\n'.join([modal_button, modal_popup]))
     cell_info_html = '<br>\n'.join(cell_info)
     return f'''
