@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 
+import sys
 import json
 import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
 
+python_version = sys.version_info
+if not (python_version.major == 3 and python_version.minor >= 10):
+    print('ERROR: this script needs Python 3.10 or above')
+    sys.exit()
+
 max_num_maps = 11
 
 Iclass = str
-IclassDefs = list[sqlite3.Row]
+InstDef = sqlite3.Row
+IclassDefs = list[InstDef]
 OpcodeMapCell = dict[Iclass, IclassDefs]
 OneOpcodeMap = list[OpcodeMapCell]
 AllOpcodeMaps = list[OneOpcodeMap]
@@ -143,7 +150,6 @@ window.onclick = function(event) {{
 }}
 
 </script>
-
 </body>
 </html>
 '''
@@ -193,32 +199,67 @@ def js_modal_exit(modal_id: str) -> str:
 def make_modal_id(map_id: int, opcode: int, iclass: str):
     return f'map_{map_id:02d}_opc_{opcode:02X}_{iclass}'
 
-def make_opcode_str(inst: sqlite3.Row) -> str:
-    opcode_hex = inst['opcode_hex']
-    partial_opcode = inst['partial_opcode']
-    mod_required = inst['mod_required']
-    reg_required = inst['reg_required']
-    if mod_required == 'unspecified':
-        if partial_opcode == 1:
-            opcode_ext = '+r'
-        else:
-            opcode_ext = ''
+def make_prefix_str(inst: InstDef) -> str:
+    space = inst['space'].upper()
+    map = int(inst['map'])
+    pp = inst['pp']
+    if space == 'LEGACY':
+        pfx = f'{pp}: ' if pp != '' else ''
+        return pfx
     else:
+        return f'{space}-MAP{map}-{pp}: '
+
+def make_opcode_str(inst: InstDef) -> str:
+    iclass = inst['iclass']
+    space = inst['space'].upper()
+    map = int(inst['map'])
+    opcode_esc = ''
+    if space == 'LEGACY':
+        if map == 1:
+            opcode_esc = '0F '
+        elif map == 2:
+            opcode_esc = '0F 38 '
+        elif map == 3:
+            opcode_esc = '0F 3A '
+    opcode_hex = inst['opcode_hex']
+    pattern = inst['pattern']
+    partial_opcode = inst['partial_opcode']
+    reg_required = inst['reg_required']
+    opcode_ext = ''
+    if 'MOD[' in pattern:
         if reg_required == 'unspecified':
             opcode_ext = ' /r'
         else:
             assert int(reg_required) in range(8)
             opcode_ext = f' /{reg_required}'
+    else:
+        if partial_opcode == 1 and iclass not in ['NOP', 'PAUSE']:
+            opcode_ext = '+r'
+    return f'{opcode_esc}{opcode_hex}{opcode_ext}'
 
+def make_disasm_str(inst: InstDef):
+    mnemonic = inst['disasm_intel']
+    if mnemonic is None:
+        mnemonic = inst['disasm']
+    if mnemonic is None:
+        mnemonic = inst['iclass']
+    mnemonic = mnemonic.lower()
+    explicit_opnds = inst['explicit_operands'].lower().replace(' ', ', ')
+    implicit_opnds = inst['implicit_operands'].lower().replace(' ', ', ')
+    items = [mnemonic]
+    if explicit_opnds != 'none':
+        items.append(explicit_opnds)
+    if implicit_opnds != 'none':
+        items.append('&lt;' + implicit_opnds + '&gt;')
+    return ' '.join(items)
 
-    return f'{opcode_hex}{opcode_ext}'
-
-def make_inst_div(inst: sqlite3.Row) -> str:
+def make_inst_div(inst: InstDef) -> str:
+    prefix_str = make_prefix_str(inst)
     opcode_str = make_opcode_str(inst)
-
+    disasm_str = make_disasm_str(inst)
 
     iform = inst['iform']
-    return f'<div>{opcode_str} {iform}</div>'
+    return f'<div>{prefix_str}{opcode_str} {disasm_str} {iform}</div>'
 
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
@@ -281,28 +322,13 @@ def html_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps) -> str:
     modals_exit_js = '\n'.join([ js_modal_exit(modal_id) for modal_id in modal_ids ])
     return html_final(maps_html, modals_click_js, modals_exit_js)
 
-def input_sdm_urls(sdm_urls_json) -> SdmUrls:
-    with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
-        return json.load(sdm_urls_json_fp)
-
-sql_query = '''
-    SELECT DISTINCT * from Instructions
-    order by map, opcode_int, iclass;
-'''
-
-def input_sqlite_db(db_file: str) -> sqlite3.Cursor:
-    with sqlite3.connect(db_file) as db:
-        db.row_factory = sqlite3.Row
-        insts = db.execute(sql_query)
-        return insts
-
 def collect_all_maps(db: sqlite3.Cursor) -> AllOpcodeMaps:
     all_maps = [ [ dict([]) for opcode in range(256) ] for map_id in range(max_num_maps) ]
     for inst in db:
         map_id = inst['map']
         opcode = inst['opcode_int']
         iclass = inst['iclass']
-        if inst['partial_opcode']:
+        if inst['partial_opcode'] and iclass not in ['NOP', 'PAUSE']:
             for i in range(8):
                 iclass_defs = all_maps[map_id][opcode + i].get(iclass, [])
                 iclass_defs.append(inst)
@@ -312,6 +338,17 @@ def collect_all_maps(db: sqlite3.Cursor) -> AllOpcodeMaps:
             iclass_defs.append(inst)
             all_maps[map_id][opcode][iclass] = iclass_defs
     return all_maps
+
+def input_sdm_urls(sdm_urls_json) -> SdmUrls:
+    with open(sdm_urls_json, 'r') as sdm_urls_json_fp:
+        return json.load(sdm_urls_json_fp)
+
+def input_sqlite_db(db_file: str) -> sqlite3.Cursor:
+    with sqlite3.connect(db_file) as db:
+        db.row_factory = InstDef
+        sql_query = 'SELECT DISTINCT * from Instructions order by map, opcode_int, iclass;'
+        insts = db.execute(sql_query)
+        return insts
 
 def output_all_maps(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, out_file: str) -> None:
     with open(out_file, 'w') as out_fp:
