@@ -176,6 +176,11 @@ modal_button_{modal_id}.onclick = function() {{
 modal_close_{modal_id}.onclick = function() {{
   modal_popup_{modal_id}.style.display = "none";
 }}
+window.addEventListener('keydown', function (event) {{
+  if (event.key === 'Escape') {{
+    modal_popup_{modal_id}.style.display = 'none'
+  }}
+}})
 '''
 
 def js_modal_exit(modal_id: str) -> str:
