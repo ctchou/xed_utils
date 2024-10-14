@@ -289,10 +289,47 @@ def make_inst_div(inst: InstDef) -> str:
     iform = inst['iform']
     return f'<div>{mode_str}{prefix_str}{opcode_str} {disasm_str} {iform}</div>'
 
+def get_map0_special(opcode: int) -> list[str]:
+    if opcode == 0x66:
+        return ['OSIZE:']
+    if opcode == 0x67:
+        return ['ASIZE:']
+    if opcode == 0xF0:
+        return ['LOCK:']
+    if opcode == 0xF2:
+        return ['REPNE:']
+    if opcode == 0xF3:
+        return ['REPE:']
+    if opcode == 0x2E:
+        return ['CS:']
+    if opcode == 0x36:
+        return ['SS:']
+    if opcode == 0x3E:
+        return ['DS:']
+    if opcode == 0x26:
+        return ['ES:']
+    if opcode == 0x64:
+        return ['FS:']
+    if opcode == 0x65:
+        return ['GS:']
+    if opcode == 0xC4:
+        return ['VEX3:']
+    if opcode == 0xC5:
+        return ['VEX2:']
+    if opcode == 0x62:
+        return ['EVEX:']
+    if opcode == 0xD5:
+        return ['REX2:']
+    if opcode in range(0x40, 0x50):
+        return ['REX:']
+    return []
+
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
     iclasses = sorted(all_maps[map_id][opcode].keys())
     cell_info = []
+    if map_id == 0:
+        cell_info += [ f'&emsp;{tok}' for tok in get_map0_special(opcode) ]
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
         url = sdm_urls.get(iclass, None)
