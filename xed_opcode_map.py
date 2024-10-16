@@ -202,15 +202,15 @@ def make_modal_id(map_id: int, opcode: int, iclass: str):
 def make_mode_str(inst: InstDef) -> str:
     mode = inst['mode_restriction']
     if mode == 'not64':
-        return 'not-64b-mode '
+        return '!64b mode'
     if mode == 0:
-        return '16b-mode '
+        return '16b mode'
     if mode == 1:
-        return '32b-mode '
+        return '32b mode'
     if mode == 2:
-        return '64b-mode '
+        return '64b mode'
     assert mode == 'unspecified'
-    return ''
+    return 'Any mode'
 
 def make_prefix_str(inst: InstDef) -> str:
     iclass = inst['iclass']
@@ -218,23 +218,19 @@ def make_prefix_str(inst: InstDef) -> str:
     map = int(inst['map'])
     pp = inst['pp']
     pattern = inst['pattern']
-    if space == 'LEGACY':
-        if ' REX2=1' in pattern:
-            if iclass == 'JMPABS':
-                return 'REX2: '
-            elif iclass in ['PUSHP', 'POPP']:
-                return 'REX2-W1: '
-            elif iclass in ['PUSH', 'POP']:
-                return 'REX2-W0: '
-            else:
-                return ''
-        elif 'NOREX2=1' in pattern:
-            return 'NOREX2: '
-        else:
-            pfx = f'{pp}: ' if pp != '' else ''
-            return pfx
-    else:
+    if space != 'LEGACY':
         return f'{space}-MAP{map}-{pp}: '
+    else:
+        pfx = pp.split()
+        if ' REX2=1' in pattern:
+            pfx.append('REX2')
+        if ' NOREX2=1' in pattern:
+            pfx.append('!REX2')
+        if ' REXW=0' in pattern:
+            pfx.append('W0')
+        if ' REXW=1' in pattern:
+            pfx.append('W1')
+        return '-'.join(pfx) + ':'
 
 def make_opcode_str(inst: InstDef) -> str:
     iclass = inst['iclass']
@@ -286,8 +282,7 @@ def make_inst_div(inst: InstDef) -> str:
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
 
-    iform = inst['iform']
-    return f'<div>{mode_str}{prefix_str}{opcode_str} {disasm_str} {iform}</div>'
+    return f'<div>{mode_str} | {prefix_str}{opcode_str} | {disasm_str}</div>'
 
 def get_map0_special(opcode: int) -> list[str]:
     if opcode == 0x66:
