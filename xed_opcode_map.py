@@ -155,8 +155,10 @@ window.onclick = function(event) {{
 </html>
 '''
 
+cell_indent = '&emsp;&emsp;&emsp;'
+
 def html_modal_button(modal_id: str, iclass: str, url: str | None) -> str:
-    button = f'<div style="display: inline" id="modal_button_{modal_id}">&emsp;{iclass}</div>'
+    button = f'<div style="display: inline" id="modal_button_{modal_id}">{cell_indent}{iclass}</div>'
     sdm_link = f' <sup><a href="{url}" target="_blank">*</a></sup>' if url else ''
     return button + sdm_link
 
@@ -226,15 +228,15 @@ def make_legacy_prefix_str(inst: InstDef) -> str:
         pfx.append('!67')
     if 'OSZ=1' in pattern and '66' not in pfx:
         pfx.append('66')
-    if 'OSZ=0' in pattern:
+    if 'OSZ=0' in pattern and 'NP' not in pfx:
         pfx.append('!66')
     if 'REP=2' in pattern and 'F2' not in pfx:
         pfx.append('F2')
-    if 'REP!=2' in pattern:
+    if 'REP!=2' in pattern and 'NP' not in pfx:
         pfx.append('!F2')
     if 'REP=3' in pattern and 'F3' not in pfx:
         pfx.append('F3')
-    if 'REP!=3' in pattern:
+    if 'REP!=3' in pattern and 'NP' not in pfx:
         pfx.append('!F3')
     if ' REX2=1' in pattern:
         pfx.append('REX2')
@@ -354,7 +356,7 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
     iclasses = sorted(all_maps[map_id][opcode].keys())
     cell_info = []
     if map_id == 0:
-        cell_info += [ f'&emsp;{tok}' for tok in get_map0_special(opcode) ]
+        cell_info += [ f'{cell_indent}{tok}' for tok in get_map0_special(opcode) ]
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
         url = sdm_urls.get(iclass, None)
@@ -366,7 +368,7 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
     cell_info_html = '<br>\n'.join(cell_info)
     return f'''
 <td>
-<b style="color: rgb(128,128,128)">{opcode_hex}</b><br>
+<b style="color: rgb(128,128,128); text-weight: 120%; padding: 4px">{opcode_hex}</b><br>
 {cell_info_html}
 </td>
 '''
