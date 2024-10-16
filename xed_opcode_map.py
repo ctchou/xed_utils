@@ -69,6 +69,7 @@ table, tr, td {{
   border:1px solid black;
   text-align: left;
   vertical-align: text-top;
+  font-family: "Monaco", "Lucida Console", monospace;
 }}
 
 /* The Modal (background) */
@@ -99,7 +100,7 @@ table, tr, td {{
 .close {{
   color: #aaaaaa;
   float: right;
-  font-size: 28px;
+  font-size: 200%;
   font-weight: bold;
 }}
 
@@ -212,25 +213,53 @@ def make_mode_str(inst: InstDef) -> str:
     assert mode == 'unspecified'
     return 'Any mode'
 
-def make_prefix_str(inst: InstDef) -> str:
-    iclass = inst['iclass']
+def make_legacy_prefix_str(inst: InstDef) -> str:
+    pattern = inst['pattern']
+    pfx = inst['pp'].split()
+    if 'LOCK=1' in pattern:
+        pfx.append('F0')
+    if 'LOCK=0' in pattern:
+        pfx.append('!F0')
+    if 'ASZ=1' in pattern:
+        pfx.append('67')
+    if 'ASZ=0' in pattern:
+        pfx.append('!67')
+    if 'OSZ=1' in pattern and '66' not in pfx:
+        pfx.append('66')
+    if 'OSZ=0' in pattern:
+        pfx.append('!66')
+    if 'REP=2' in pattern and 'F2' not in pfx:
+        pfx.append('F2')
+    if 'REP!=2' in pattern:
+        pfx.append('!F2')
+    if 'REP=3' in pattern and 'F3' not in pfx:
+        pfx.append('F3')
+    if 'REP!=3' in pattern:
+        pfx.append('!F3')
+    if ' REX2=1' in pattern:
+        pfx.append('REX2')
+    if ' NOREX2=1' in pattern:
+        pfx.append('!REX2')
+    if ' REXW=0' in pattern:
+        pfx.append('W0')
+    if ' REXW=1' in pattern:
+        pfx.append('W1')
+    if pfx == []:
+        return ''
+    else:
+        return '-'.join(pfx) + ': '
+
+def make_vex_evex_prefix_str(inst: InstDef) -> str:
     space = inst['space'].upper()
     map = int(inst['map'])
     pp = inst['pp']
-    pattern = inst['pattern']
-    if space != 'LEGACY':
-        return f'{space}-MAP{map}-{pp}: '
+    return f'{space}-MAP{map}-{pp}: '
+
+def make_prefix_str(inst: InstDef) -> str:
+    if inst['space'] == 'legacy':
+        return make_legacy_prefix_str(inst)
     else:
-        pfx = pp.split()
-        if ' REX2=1' in pattern:
-            pfx.append('REX2')
-        if ' NOREX2=1' in pattern:
-            pfx.append('!REX2')
-        if ' REXW=0' in pattern:
-            pfx.append('W0')
-        if ' REXW=1' in pattern:
-            pfx.append('W1')
-        return '-'.join(pfx) + ':'
+        return make_vex_evex_prefix_str(inst)
 
 def make_opcode_str(inst: InstDef) -> str:
     iclass = inst['iclass']
@@ -282,7 +311,8 @@ def make_inst_div(inst: InstDef) -> str:
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
 
-    return f'<div>{mode_str} | {prefix_str}{opcode_str} | {disasm_str}</div>'
+    pattern = inst['pattern']
+    return f'<div>{mode_str} | {prefix_str}{opcode_str} | {disasm_str} >>> {pattern}</div>'
 
 def get_map0_special(opcode: int) -> list[str]:
     if opcode == 0x66:
@@ -336,7 +366,7 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
     cell_info_html = '<br>\n'.join(cell_info)
     return f'''
 <td>
-<b style="font-size: 120%">{opcode_hex}</b><br>
+<b style="color: rgb(128,128,128)">{opcode_hex}</b><br>
 {cell_info_html}
 </td>
 '''
@@ -388,8 +418,17 @@ def collect_all_maps(db: sqlite3.Cursor) -> AllOpcodeMaps:
         map_id = inst['map']
         opcode = inst['opcode_int']
         iclass = inst['iclass']
-        if inst['partial_opcode'] and iclass not in ['NOP', 'PAUSE']:
+        pattern = inst['pattern']
+        if inst['partial_opcode']:
             for i in range(8):
+                if iclass == 'PAUSE' and i > 0:
+                    break
+                if iclass == 'NOP' and (i > 0 or 'P4=0' in pattern):
+                    break
+                if iclass == 'XCHG' and opcode == 0x90 and i > 0 and 'SRM=0' in pattern:
+                    break
+                if iclass == 'XCHG' and opcode == 0x90 and i == 0 and 'SRM!=0' in pattern:
+                    continue
                 iclass_defs = all_maps[map_id][opcode + i].get(iclass, [])
                 iclass_defs.append(inst)
                 all_maps[map_id][opcode + i][iclass] = iclass_defs
