@@ -255,7 +255,20 @@ def make_vex_evex_prefix_str(inst: InstDef) -> str:
     space = inst['space'].upper()
     map = int(inst['map'])
     pp = inst['pp']
-    return f'{space}-MAP{map}-{pp}: '
+    vl = inst['vl']
+    if vl is None or vl == 'n/a' or map == 4:
+        vlen = ''
+    else:
+        vlen = f'-{vl}'
+    rexw_prefix = inst['rexw_prefix']
+    if rexw_prefix is None:
+        rexw = ''
+    elif rexw_prefix == 'unspecified':
+        rexw = '-WIG'
+    else:
+        rexw = f'-W{rexw_prefix}'
+
+    return f'{space}-MAP{map}-{pp}{vlen}{rexw}: '
 
 def make_prefix_str(inst: InstDef) -> str:
     if inst['space'] == 'legacy':
