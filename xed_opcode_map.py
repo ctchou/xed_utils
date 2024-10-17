@@ -313,7 +313,7 @@ def make_opcode_str(inst: InstDef) -> str:
             opcode_ext = '+r'
     return f'{opcode_esc}{opcode_hex}{opcode_ext}'
 
-def make_disasm_str(inst: InstDef):
+def make_disasm_str(inst: InstDef) -> str:
     mnemonic = inst['disasm_intel']
     if mnemonic is None:
         mnemonic = inst['disasm']
@@ -329,17 +329,22 @@ def make_disasm_str(inst: InstDef):
         items.append('&lt;' + implicit_opnds + '&gt;')
     return ' '.join(items)
 
-def make_amd_via_str(inst: InstDef):
+def get_knl_amd_via_type(inst: InstDef) -> tuple[str, str] | None:
     extension = inst['extension']
     isa_set = inst['isa_set']
-    if any([ (name in extension) for name in ['3DNOW', 'XOP'] ]):
-        return f' (AMD {extension})'
-    if any([ (name in extension) for name in ['AMD', 'VIA'] ]):
-        return f' ({extension})'
-    if any([ (name in isa_set) for name in ['AVX512ER', 'AVX512PF'] ]):
-        return f' (KNL {isa_set})'
+    if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set:
+        return (f'KNL_{isa_set}', 'DarkBlue')
+    if '3DNOW' in extension or 'XOP' in extension:
+        if inst['iclass'] == 'PREFETCHW' and inst['opcode_hex'] == '0D' and int(inst['reg_required']) == 1:
+            return (None, 'Black')
+        else:
+            return (f'AMD_{extension}', 'DarkGreen')
+    if 'AMD' in extension:
+        return (f'{extension}', 'DarkGreen')
+    if 'VIA' in extension:
+        return (f'{extension}', 'DarkMagenta')
     else:
-        return ''
+        return (None, 'Black')
 
 def make_inst_div(inst: InstDef) -> str:
     mode_str = make_mode_str(inst)
@@ -347,10 +352,14 @@ def make_inst_div(inst: InstDef) -> str:
     prefix_str = make_prefix_str(inst)
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
-    amd_via_str = make_amd_via_str(inst)
+    type, color = get_knl_amd_via_type(inst)
+    if type:
+        knl_amd_via_str = f' ({type})'
+    else:
+        knl_amd_via_str = ''
 
     pattern = inst['pattern']
-    return f'<div>{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{amd_via_str} >>> {pattern}</div>'
+    return f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{knl_amd_via_str} >>> {pattern}</div>'
         
 prefix_opcode_dict = {
     0x66: 'OSIZE:', 0x67: 'ASIZE:',
