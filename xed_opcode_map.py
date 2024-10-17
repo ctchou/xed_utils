@@ -215,6 +215,13 @@ def make_mode_str(inst: InstDef) -> str:
     assert mode == 'unspecified'
     return 'Any mode'
 
+def make_cpl_str(inst: InstDef) -> str:
+    cpl = inst['cpl']
+    if int(cpl) == 0:
+        return ' CPL0'
+    else:
+        return ''
+
 def make_legacy_prefix_str(inst: InstDef) -> str:
     pattern = inst['pattern']
     pfx = inst['pp'].split()
@@ -237,6 +244,9 @@ def make_legacy_prefix_str(inst: InstDef) -> str:
     if 'REP=3' in pattern and 'F3' not in pfx:
         pfx.append('F3')
     if 'REP!=3' in pattern and 'NP' not in pfx:
+        pfx.append('!F3')
+    if 'REP=0' in pattern and 'NP' not in pfx:
+        pfx.append('!F2')
         pfx.append('!F3')
     if ' REX2=1' in pattern:
         pfx.append('REX2')
@@ -267,7 +277,6 @@ def make_vex_evex_prefix_str(inst: InstDef) -> str:
         rexw = '-WIG'
     else:
         rexw = f'-W{rexw_prefix}'
-
     return f'{space}-MAP{map}-{pp}{vlen}{rexw}: '
 
 def make_prefix_str(inst: InstDef) -> str:
@@ -322,47 +331,35 @@ def make_disasm_str(inst: InstDef):
 
 def make_inst_div(inst: InstDef) -> str:
     mode_str = make_mode_str(inst)
+    cpl_str = make_cpl_str(inst)
     prefix_str = make_prefix_str(inst)
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
 
     pattern = inst['pattern']
-    return f'<div>{mode_str} | {prefix_str}{opcode_str} | {disasm_str} >>> {pattern}</div>'
+    return f'<div>{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str} >>> {pattern}</div>'
+
+prefix_opcode_dict = {
+    0x66: 'OSIZE:', 0x67: 'ASIZE:',
+    0xF0: 'LOCK:', 0xF2: 'REPNE:', 0xF3: 'REPE:',
+    0x2E: 'CS:', 0x36: 'SS:', 0x3E: 'DS:', 0x26: 'ES:', 0x64: 'FS:', 0x65: 'GS:',
+    0xC5: 'VEX2:', 0xC4: 'VEX3:',
+    0x62: 'EVEX:',
+    0xD5: 'REX2:',
+}
 
 def get_map0_special(opcode: int) -> list[str]:
-    if opcode == 0x66:
-        return ['OSIZE:']
-    if opcode == 0x67:
-        return ['ASIZE:']
-    if opcode == 0xF0:
-        return ['LOCK:']
-    if opcode == 0xF2:
-        return ['REPNE:']
-    if opcode == 0xF3:
-        return ['REPE:']
-    if opcode == 0x2E:
-        return ['CS:']
-    if opcode == 0x36:
-        return ['SS:']
-    if opcode == 0x3E:
-        return ['DS:']
-    if opcode == 0x26:
-        return ['ES:']
-    if opcode == 0x64:
-        return ['FS:']
-    if opcode == 0x65:
-        return ['GS:']
-    if opcode == 0xC4:
-        return ['VEX3:']
-    if opcode == 0xC5:
-        return ['VEX2:']
-    if opcode == 0x62:
-        return ['EVEX:']
-    if opcode == 0xD5:
-        return ['REX2:']
+    pfx = prefix_opcode_dict.get(opcode, None)
+    if pfx:
+        return [pfx]
     if opcode in range(0x40, 0x50):
         return ['REX:']
     return []
+
+def inst_sort_key(inst: InstDef):
+    space = inst['space']
+    space_key = 0 if space == 'legacy' else 1 if space == 'vex' else 2
+    return (space_key, inst['vl'], inst['pattern'])
 
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
@@ -374,7 +371,7 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
         modal_id = make_modal_id(map_id, opcode, iclass)
         url = sdm_urls.get(iclass, None)
         modal_button = html_modal_button(modal_id, iclass, url)
-        inst_defs = all_maps[map_id][opcode][iclass]
+        inst_defs = sorted(all_maps[map_id][opcode][iclass], key=inst_sort_key)
         inst_divs = [ make_inst_div(inst) for inst in inst_defs ]
         modal_popup = html_modal_popup(modal_id, inst_divs)
         cell_info.append('\n'.join([modal_button, modal_popup]))
@@ -442,7 +439,7 @@ def collect_all_maps(db: sqlite3.Cursor) -> AllOpcodeMaps:
                     break
                 if iclass == 'XCHG' and opcode == 0x90 and i > 0 and 'SRM=0' in pattern:
                     break
-                if iclass == 'XCHG' and opcode == 0x90 and i == 0 and 'SRM!=0' in pattern:
+                if iclass == 'XCHG' and opcode == 0x90 and i == 0:
                     continue
                 iclass_defs = all_maps[map_id][opcode + i].get(iclass, [])
                 iclass_defs.append(inst)
