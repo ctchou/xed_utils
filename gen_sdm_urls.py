@@ -39,10 +39,10 @@ re_jcc = re.compile(f'^j{cond_codes}$')
 re_setcc = re.compile(f'^set{cond_codes}$')
 re_cmovcc = re.compile(f'^cmov{cond_codes}$')
 re_fcmovcc = re.compile(r'^fcmov(b|nb|be|nbe|e|ne|u|nu)$')
+re_rep_string = re.compile(r'^(rep|repe|repne)_(in|out|mov|cmp|lod|sto|sca|)s.*$')
 
 re_prefix_1 = re.compile(r'^(?P<stem>vpshld|vpshldv|vpshrd|vpshrdv).$')
 re_prefix_any = re.compile(r'^(?P<stem>pmovsx|pmovzx|vbroadcast|vmaskmov|vpmaskmov|vpopcnt).*$')
-re_strip_prefix = re.compile(r'^(rep|repe|repne)_(?P<stem>.+)$')
 re_strip_suffix = re.compile(r'^(?P<stem>.+)_(lock|near|far|xmm|sse4)$')
 re_strip_64 = re.compile(r'^(?P<stem>fxsave|fxrstor|pcmpestri|pcmpestrm|pcmpistri|sysret|xrstor|xrstors|xsave|xsavec|xsaveopt|xsaves)64$')
 
@@ -67,7 +67,6 @@ misc_dict = {
 
 def get_sdm_name(iclass: str, sdm_dict: Dict[str, str]) -> Optional[str]:
     iclass = iclass.lower()
-
     if re_jcc.match(iclass):
         return 'jcc'
     if re_setcc.match(iclass):
@@ -76,15 +75,14 @@ def get_sdm_name(iclass: str, sdm_dict: Dict[str, str]) -> Optional[str]:
         return 'cmovcc'
     if re_fcmovcc.match(iclass):
         return 'fcmovcc'
+    if re_rep_string.match(iclass):
+        return 'rep:repe:repz:repne:repnz'
     m = re_prefix_1.match(iclass)
     if m:
         return m.group('stem')
     m = re_prefix_any.match(iclass)
     if m:
         return m.group('stem')
-    m = re_strip_prefix.match(iclass)
-    if m:
-        iclass = m.group('stem')
     m = re_strip_suffix.match(iclass)
     if m:
         iclass = m.group('stem')
