@@ -329,16 +329,29 @@ def make_disasm_str(inst: InstDef):
         items.append('&lt;' + implicit_opnds + '&gt;')
     return ' '.join(items)
 
+def make_amd_via_str(inst: InstDef):
+    extension = inst['extension']
+    isa_set = inst['isa_set']
+    if any([ (name in extension) for name in ['3DNOW', 'XOP'] ]):
+        return f' (AMD {extension})'
+    if any([ (name in extension) for name in ['AMD', 'VIA'] ]):
+        return f' ({extension})'
+    if any([ (name in isa_set) for name in ['AVX512ER', 'AVX512PF'] ]):
+        return f' (KNL {isa_set})'
+    else:
+        return ''
+
 def make_inst_div(inst: InstDef) -> str:
     mode_str = make_mode_str(inst)
     cpl_str = make_cpl_str(inst)
     prefix_str = make_prefix_str(inst)
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
+    amd_via_str = make_amd_via_str(inst)
 
     pattern = inst['pattern']
-    return f'<div>{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str} >>> {pattern}</div>'
-
+    return f'<div>{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{amd_via_str} >>> {pattern}</div>'
+        
 prefix_opcode_dict = {
     0x66: 'OSIZE:', 0x67: 'ASIZE:',
     0xF0: 'LOCK:', 0xF2: 'REPNE:', 0xF3: 'REPE:',
@@ -346,6 +359,7 @@ prefix_opcode_dict = {
     0xC5: 'VEX2:', 0xC4: 'VEX3:',
     0x62: 'EVEX:',
     0xD5: 'REX2:',
+    0x8F: 'XOP:',
 }
 
 def get_map0_special(opcode: int) -> list[str]:
@@ -393,8 +407,9 @@ def html_row(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, row_id: in
 
 def html_one_map(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int) -> str:
     all_rows_html = '\n'.join([ html_row(sdm_urls, all_maps, map_id, row_id) for row_id in range(16) ])
+    amd_xop = 'AMD XOP ' if map_id >= 8 else ''
     return f'''
-<button class="collapsible">Map {map_id}</button>
+<button class="collapsible">{amd_xop}Map {map_id}</button>
 <div class="content">
 <br>
 <table style="width:100%">
