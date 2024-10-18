@@ -15,8 +15,8 @@ if not (python_version.major == 3 and python_version.minor >= 10):
 max_num_maps = 11
 
 color_x86 = 'Black'
-color_knl = 'DarkBlue'
-color_amd = 'DarkGreen'
+color_phi = 'Blue'
+color_amd = 'Green'
 color_via = 'DarkMagenta'
 
 def merge_colors(colors: list[str]) -> str:
@@ -25,8 +25,8 @@ def merge_colors(colors: list[str]) -> str:
     return colors[0]
 
 def get_family_color(family: str) -> str:
-    if 'KNL' in family:
-        return color_knl
+    if 'PHI' in family:
+        return color_phi
     if 'AMD' in family:
         return color_amd
     if 'VIA' in family:
@@ -335,6 +335,8 @@ def make_opcode_str(inst: InstDef) -> str:
             opcode_esc = '0F 38 '
         elif map == 3:
             opcode_esc = '0F 3A '
+        elif map == 4:
+            opcode_esc = '0F 0F '
     opcode_hex = inst['opcode_hex']
     pattern = inst['pattern']
     partial_opcode = inst['partial_opcode']
@@ -371,8 +373,8 @@ def get_inst_family(inst: InstDef) -> str:
     attributes = inst['attributes'].split()
     extension = inst['extension']
     isa_set = inst['isa_set']
-    if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set or 'PREFETCHWT1' in isa_set:
-        return f'KNL_{isa_set}'
+    if any([ (name in isa_set) for name in ['PREFETCHWT1', 'AVX512ER', 'AVX512PF', 'AVX512_4FMAPS', 'AVX512_4VNNIW'] ]):
+        return f'XEON_PHI_{isa_set}'
     if 'AMDONLY' in attributes:
         if 'AMD' in extension:
             return extension
