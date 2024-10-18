@@ -323,6 +323,36 @@ def make_prefix_str(inst: InstDef) -> str:
     else:
         return make_vex_evex_prefix_str(inst)
 
+def make_modrm_str(inst: InstDef) -> str:
+    mod_required = inst['mod_required']
+    reg_required = inst['reg_required']
+    rm_required = inst['rm_required']
+    if mod_required in ['unspecified']:
+        assert reg_required == 'unspecified'
+        return '/r'
+    elif mod_required == '00/01/10':
+        if reg_required == 'unspecified':
+            return '/r'
+        else:
+            assert int(reg_required) in range(8)
+            return f'/{reg_required}'
+    else:
+        assert mod_required == 3
+        if reg_required == 'unspecified':
+            if rm_required == 'unspecified':
+                return '/r'
+            else:
+                assert int(rm_required) in range(8)
+                return f'11:rrr:{rm_required}'
+        else:
+            assert int(reg_required) in range(8)
+            if rm_required == 'unspecified':
+                return f'/{reg_required}'
+            else:
+                assert int(rm_required) in range(8)
+                modrm = (mod_required << 6) + (reg_required << 3) + rm_required
+                return f'{modrm:02X}'
+
 def make_opcode_str(inst: InstDef) -> str:
     iclass = inst['iclass']
     space = inst['space'].upper()
@@ -340,17 +370,12 @@ def make_opcode_str(inst: InstDef) -> str:
     opcode_hex = inst['opcode_hex']
     pattern = inst['pattern']
     partial_opcode = inst['partial_opcode']
-    reg_required = inst['reg_required']
     opcode_ext = ''
     if 'MOD[' in pattern:
-        if reg_required == 'unspecified':
-            opcode_ext = ' /r'
-        else:
-            assert int(reg_required) in range(8)
-            opcode_ext = f' /{reg_required}'
-    else:
-        if partial_opcode == 1 and iclass not in ['NOP', 'PAUSE']:
-            opcode_ext = '+r'
+        modrm = make_modrm_str(inst)
+        opcode_ext = f' {modrm}'
+    elif partial_opcode == 1 and iclass not in ['NOP', 'PAUSE']:
+        opcode_ext = '+r'
     return f'{opcode_esc}{opcode_hex}{opcode_ext}'
 
 def make_disasm_str(inst: InstDef) -> str:
