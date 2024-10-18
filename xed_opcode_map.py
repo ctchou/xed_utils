@@ -8,10 +8,25 @@ from argparse import ArgumentParser
 
 python_version = sys.version_info
 if not (python_version.major == 3 and python_version.minor >= 10):
-    print('ERROR: this script needs Python 3.10 or above')
+    print('ERROR: this script requires Python 3.10 or above')
     sys.exit()
 
 max_num_maps = 11
+
+color_x86 = 'Black'
+color_knl = 'DarkBlue'
+color_amd = 'DarkGreen'
+color_via = 'DarkMagenta'
+
+def get_family_color(family: str) -> str:
+    if 'KNL' in family:
+        return color_knl
+    if 'AMD' in family:
+        return color_amd
+    if 'VIA' in family:
+        return color_via
+    assert family == 'X86'
+    return color_x86
 
 Iclass = str
 InstDef = sqlite3.Row
@@ -329,22 +344,22 @@ def make_disasm_str(inst: InstDef) -> str:
         items.append('&lt;' + implicit_opnds + '&gt;')
     return ' '.join(items)
 
-def get_knl_amd_via_type(inst: InstDef) -> tuple[str, str] | None:
+def get_inst_family(inst: InstDef) -> str:
     extension = inst['extension']
     isa_set = inst['isa_set']
     if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set:
-        return (f'KNL_{isa_set}', 'DarkBlue')
+        return f'KNL_{isa_set}'
     if '3DNOW' in extension or 'XOP' in extension:
         if inst['iclass'] == 'PREFETCHW' and inst['opcode_hex'] == '0D' and int(inst['reg_required']) == 1:
-            return (None, 'Black')
+            return 'X86'
         else:
-            return (f'AMD_{extension}', 'DarkGreen')
+            return f'AMD_{extension}'
     if 'AMD' in extension:
-        return (f'{extension}', 'DarkGreen')
+        return f'{extension}'
     if 'VIA' in extension:
-        return (f'{extension}', 'DarkMagenta')
+        return f'{extension}'
     else:
-        return (None, 'Black')
+        return 'X86'
 
 def make_inst_div(inst: InstDef) -> str:
     mode_str = make_mode_str(inst)
@@ -352,14 +367,15 @@ def make_inst_div(inst: InstDef) -> str:
     prefix_str = make_prefix_str(inst)
     opcode_str = make_opcode_str(inst)
     disasm_str = make_disasm_str(inst)
-    type, color = get_knl_amd_via_type(inst)
-    if type:
-        knl_amd_via_str = f' ({type})'
+    family = get_inst_family(inst)
+    color = get_family_color(family)
+    if family == 'X86':
+        family_str = ''
     else:
-        knl_amd_via_str = ''
+        family_str = f' ({family})'
 
     pattern = inst['pattern']
-    return f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{knl_amd_via_str} >>> {pattern}</div>'
+    return f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str} >>> {pattern}</div>'
         
 prefix_opcode_dict = {
     0x66: 'OSIZE:', 0x67: 'ASIZE:',
@@ -368,15 +384,16 @@ prefix_opcode_dict = {
     0xC5: 'VEX2:', 0xC4: 'VEX3:',
     0x62: 'EVEX:',
     0xD5: 'REX2:',
-    0x8F: 'XOP:',
 }
 
 def get_map0_special(opcode: int) -> list[str]:
     pfx = prefix_opcode_dict.get(opcode, None)
     if pfx:
-        return [pfx]
+        return [f'<div style="display: inline; color: {color_x86}">{cell_indent}{pfx}</div>']
     if opcode in range(0x40, 0x50):
-        return ['REX:']
+        return [f'<div style="display: inline; color: {color_x86}">{cell_indent}REX:</div>']
+    if opcode == 0x8F:
+        return [f'<div style="display: inline; color: {color_amd}">{cell_indent}XOP:</div>']
     return []
 
 def inst_sort_key(inst: InstDef):
@@ -389,7 +406,7 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
     iclasses = sorted(all_maps[map_id][opcode].keys())
     cell_info = []
     if map_id == 0:
-        cell_info += [ f'{cell_indent}{tok}' for tok in get_map0_special(opcode) ]
+        cell_info += get_map0_special(opcode)
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
         url = sdm_urls.get(iclass, None)
