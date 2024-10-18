@@ -354,7 +354,7 @@ def get_inst_family(inst: InstDef) -> str:
     isa_set = inst['isa_set']
     if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set:
         return f'KNL_{isa_set}'
-    if '3DNOW' in extension or 'XOP' in extension:
+    if '3DNOW' in extension or 'XOP' in extension or 'TBM' in extension or 'FMA4' in extension:
         if inst['iclass'] == 'PREFETCHW' and inst['opcode_hex'] == '0D' and int(inst['reg_required']) == 1:
             return 'X86'
         else:
