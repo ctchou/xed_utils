@@ -371,7 +371,7 @@ def get_inst_family(inst: InstDef) -> str:
     attributes = inst['attributes'].split()
     extension = inst['extension']
     isa_set = inst['isa_set']
-    if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set:
+    if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set or 'PREFETCHWT1' in isa_set:
         return f'KNL_{isa_set}'
     if 'AMDONLY' in attributes:
         if 'AMD' in extension:
