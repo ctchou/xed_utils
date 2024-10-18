@@ -6,13 +6,28 @@ import json
 import sqlite3
 from pathlib import Path
 from argparse import ArgumentParser
+from typing import Any
 
 python_version = sys.version_info
 if not (python_version.major == 3 and python_version.minor >= 10):
     print('ERROR: this script requires Python 3.10 or above')
     sys.exit()
 
-max_num_maps = 11
+def rm_adj_dups(xs : list[Any]) -> list[Any]:
+    ys, last = ([], None)
+    for x in xs:
+        if x != last:
+            ys.append(x)
+            last = x
+    return ys
+
+Iclass = str
+InstDef = sqlite3.Row
+IclassDefs = list[InstDef]
+OpcodeMapCell = dict[Iclass, IclassDefs]
+OneOpcodeMap = list[OpcodeMapCell]
+AllOpcodeMaps = list[OneOpcodeMap]
+SdmUrls = dict[Iclass, str]
 
 color_x86 = 'Black'
 color_phi = 'Blue'
@@ -34,13 +49,8 @@ def get_family_color(family: str) -> str:
     assert family == 'X86'
     return color_x86
 
-Iclass = str
-InstDef = sqlite3.Row
-IclassDefs = list[InstDef]
-OpcodeMapCell = dict[Iclass, IclassDefs]
-OneOpcodeMap = list[OpcodeMapCell]
-AllOpcodeMaps = list[OneOpcodeMap]
-SdmUrls = dict[Iclass, str]
+max_num_maps = 11
+cell_indent = '&emsp;&emsp;&emsp;'
 
 def html_final(maps_html: str, modals_click_js: str, modals_exit_js) -> str:
     return f'''
@@ -175,8 +185,6 @@ window.onclick = function(event) {{
 </body>
 </html>
 '''
-
-cell_indent = '&emsp;&emsp;&emsp;'
 
 def html_modal_button(modal_id: str, iclass: str, color: str, url: str | None) -> str:
     button = f'<div style="display: inline; color: {color}" id="modal_button_{modal_id}">{cell_indent}{iclass}</div>'
@@ -434,11 +442,9 @@ def make_inst_info(inst: InstDef) -> tuple[str, str]:
         family_str = ''
     else:
         family_str = f' ({family})'
+    return (color,
+            f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str}</div>')
 
-    operands = inst['operands']
-    return (f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str} >>> {operands}</div>',
-            color)
-        
 prefix_opcode_dict = {
     0x66: 'OSIZE:', 0x67: 'ASIZE:',
     0xF0: 'LOCK:', 0xF2: 'REPNE:', 0xF3: 'REPE:',
@@ -478,10 +484,10 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
         modal_id = make_modal_id(map_id, opcode, iclass)
         iclass_url = sdm_urls.get(iclass, None)
         inst_defs = sorted(all_maps[map_id][opcode][iclass], key=inst_sort_key)
-        inst_divs, inst_colors = zip(*[ make_inst_info(inst) for inst in inst_defs ])
+        inst_colors, inst_divs = zip(*[ make_inst_info(inst) for inst in inst_defs ])
         iclass_color = merge_colors(inst_colors)
         modal_button = html_modal_button(modal_id, iclass, iclass_color, iclass_url)
-        modal_popup = html_modal_popup(modal_id, inst_divs)
+        modal_popup = html_modal_popup(modal_id, rm_adj_dups(inst_divs))
         cell_info.append( (iclass_color, iclass, '\n'.join([modal_button, modal_popup])) )
     if len(cell_info) > 0:
         cell_info = sorted(cell_info, key=iclass_sort_key)
