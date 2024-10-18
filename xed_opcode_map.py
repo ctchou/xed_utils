@@ -378,6 +378,24 @@ def make_opcode_str(inst: InstDef) -> str:
         opcode_ext = '+r'
     return f'{opcode_esc}{opcode_hex}{opcode_ext}'
 
+def make_operands_list(inst: InstDef) -> list[str]:
+    operands = inst['operands'].lower().split()
+    exp_opnds = inst['explicit_operands'].replace('none', '').lower().split()
+    imp_opnds = inst['implicit_operands'].replace('none', '').lower().split()
+    opnds_list = []
+    exp_idx, imp_idx = (0, 0)
+    for opnd in operands:
+        if ':impl' in opnd or ':supp' in opnd:
+            if imp_idx < len(imp_opnds):
+                opnds_list.append('&lt;' + imp_opnds[imp_idx] + '&gt;')
+                imp_idx += 1
+        else:
+            if exp_idx < len(exp_opnds):
+                opnds_list.append(exp_opnds[exp_idx])
+                exp_idx += 1
+    assert exp_idx == len(exp_opnds) and imp_idx == len(imp_opnds), dict(inst)
+    return opnds_list
+
 def make_disasm_str(inst: InstDef) -> str:
     mnemonic = inst['disasm_intel']
     if mnemonic is None:
@@ -385,14 +403,8 @@ def make_disasm_str(inst: InstDef) -> str:
     if mnemonic is None:
         mnemonic = inst['iclass']
     mnemonic = mnemonic.lower()
-    explicit_opnds = inst['explicit_operands'].lower().replace(' ', ', ')
-    implicit_opnds = inst['implicit_operands'].lower().replace(' ', ', ')
-    items = [mnemonic]
-    if explicit_opnds != 'none':
-        items.append(explicit_opnds)
-    if implicit_opnds != 'none':
-        items.append('&lt;' + implicit_opnds + '&gt;')
-    return ' '.join(items)
+    operands = ', '.join(make_operands_list(inst))
+    return f'{mnemonic} {operands}'
 
 def get_inst_family(inst: InstDef) -> str:
     attributes = inst['attributes'].split()
@@ -423,8 +435,8 @@ def make_inst_info(inst: InstDef) -> tuple[str, str]:
     else:
         family_str = f' ({family})'
 
-    pattern = inst['pattern']
-    return (f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str} >>> {pattern}</div>',
+    operands = inst['operands']
+    return (f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str} >>> {operands}</div>',
             color)
         
 prefix_opcode_dict = {
