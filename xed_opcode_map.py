@@ -18,6 +18,11 @@ color_knl = 'DarkBlue'
 color_amd = 'DarkGreen'
 color_via = 'DarkMagenta'
 
+def merge_colors(colors: list[str]) -> str:
+    if color_x86 in colors:
+        return color_x86
+    return colors[0]
+
 def get_family_color(family: str) -> str:
     if 'KNL' in family:
         return color_knl
@@ -172,8 +177,8 @@ window.onclick = function(event) {{
 
 cell_indent = '&emsp;&emsp;&emsp;'
 
-def html_modal_button(modal_id: str, iclass: str, url: str | None) -> str:
-    button = f'<div style="display: inline" id="modal_button_{modal_id}">{cell_indent}{iclass}</div>'
+def html_modal_button(modal_id: str, iclass: str, color: str, url: str | None) -> str:
+    button = f'<div style="display: inline; color: {color}" id="modal_button_{modal_id}">{cell_indent}{iclass}</div>'
     sdm_link = f' <sup><a href="{url}" target="_blank">*</a></sup>' if url else ''
     return button + sdm_link
 
@@ -361,7 +366,7 @@ def get_inst_family(inst: InstDef) -> str:
     else:
         return 'X86'
 
-def make_inst_div(inst: InstDef) -> str:
+def make_inst_div(inst: InstDef) -> tuple[str, str]:
     mode_str = make_mode_str(inst)
     cpl_str = make_cpl_str(inst)
     prefix_str = make_prefix_str(inst)
@@ -375,7 +380,8 @@ def make_inst_div(inst: InstDef) -> str:
         family_str = f' ({family})'
 
     pattern = inst['pattern']
-    return f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str} >>> {pattern}</div>'
+    return (f'<div style="color: {color}">{mode_str}{cpl_str} | {prefix_str}{opcode_str} | {disasm_str}{family_str} >>> {pattern}</div>',
+            color)
         
 prefix_opcode_dict = {
     0x66: 'OSIZE:', 0x67: 'ASIZE:',
@@ -409,10 +415,11 @@ def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: i
         cell_info += get_map0_special(opcode)
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
-        url = sdm_urls.get(iclass, None)
-        modal_button = html_modal_button(modal_id, iclass, url)
+        iclass_url = sdm_urls.get(iclass, None)
         inst_defs = sorted(all_maps[map_id][opcode][iclass], key=inst_sort_key)
-        inst_divs = [ make_inst_div(inst) for inst in inst_defs ]
+        inst_divs, inst_colors = zip(*[ make_inst_div(inst) for inst in inst_defs ])
+        iclass_color = merge_colors(inst_colors)
+        modal_button = html_modal_button(modal_id, iclass, iclass_color, iclass_url)
         modal_popup = html_modal_popup(modal_id, inst_divs)
         cell_info.append('\n'.join([modal_button, modal_popup]))
     cell_info_html = '<br>\n'.join(cell_info)
