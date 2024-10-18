@@ -368,17 +368,16 @@ def make_disasm_str(inst: InstDef) -> str:
     return ' '.join(items)
 
 def get_inst_family(inst: InstDef) -> str:
+    attributes = inst['attributes'].split()
     extension = inst['extension']
     isa_set = inst['isa_set']
     if 'AVX512ER' in isa_set or 'AVX512PF' in isa_set:
         return f'KNL_{isa_set}'
-    if '3DNOW' in extension or 'XOP' in extension or 'TBM' in extension or 'FMA4' in extension:
-        if inst['iclass'] == 'PREFETCHW' and inst['opcode_hex'] == '0D' and int(inst['reg_required']) == 1:
-            return 'X86'
+    if 'AMDONLY' in attributes:
+        if 'AMD' in extension:
+            return extension
         else:
             return f'AMD_{extension}'
-    if 'AMD' in extension:
-        return f'{extension}'
     if 'VIA' in extension:
         return f'{extension}'
     else:
