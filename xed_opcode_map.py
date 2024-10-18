@@ -385,7 +385,7 @@ def get_inst_family(inst: InstDef) -> str:
     else:
         return 'X86'
 
-def make_inst_div(inst: InstDef) -> tuple[str, str]:
+def make_inst_info(inst: InstDef) -> tuple[str, str]:
     mode_str = make_mode_str(inst)
     cpl_str = make_cpl_str(inst)
     prefix_str = make_prefix_str(inst)
@@ -411,7 +411,9 @@ prefix_opcode_dict = {
     0xD5: 'REX2:',
 }
 
-def get_map0_special(opcode: int) -> list[str]:
+def get_map0_special(map_id: int, opcode: int) -> list[str]:
+    if map_id != 0:
+        return []
     pfx = prefix_opcode_dict.get(opcode, None)
     if pfx:
         return [f'<div style="display: inline; color: {color_x86}">{cell_indent}{pfx}</div>']
@@ -426,26 +428,36 @@ def inst_sort_key(inst: InstDef):
     space_key = 0 if space == 'legacy' else 1 if space == 'vex' else 2
     return (space_key, inst['vl'], inst['pattern'])
 
+def iclass_sort_key(info):
+    color, iclass, _ = info
+    color_key = 0 if color == color_x86 else 1
+    return (color_key, iclass)
+
 def html_cell(sdm_urls: SdmUrls, all_maps: AllOpcodeMaps, map_id: int, opcode: int) -> str:
     opcode_hex = f'{opcode:02X}'
-    iclasses = sorted(all_maps[map_id][opcode].keys())
+    iclasses = all_maps[map_id][opcode].keys()
     cell_info = []
-    if map_id == 0:
-        cell_info += get_map0_special(opcode)
     for iclass in iclasses:
         modal_id = make_modal_id(map_id, opcode, iclass)
         iclass_url = sdm_urls.get(iclass, None)
         inst_defs = sorted(all_maps[map_id][opcode][iclass], key=inst_sort_key)
-        inst_divs, inst_colors = zip(*[ make_inst_div(inst) for inst in inst_defs ])
+        inst_divs, inst_colors = zip(*[ make_inst_info(inst) for inst in inst_defs ])
         iclass_color = merge_colors(inst_colors)
         modal_button = html_modal_button(modal_id, iclass, iclass_color, iclass_url)
         modal_popup = html_modal_popup(modal_id, inst_divs)
-        cell_info.append('\n'.join([modal_button, modal_popup]))
-    cell_info_html = '<br>\n'.join(cell_info)
+        cell_info.append( (iclass_color, iclass, '\n'.join([modal_button, modal_popup])) )
+    if len(cell_info) > 0:
+        cell_info = sorted(cell_info, key=iclass_sort_key)
+        _, _, cell_contents = zip(*cell_info)
+        cell_contents = list(cell_contents)
+    else:
+        cell_contents = []
+    map0_special = get_map0_special(map_id, opcode)
+    cell_contents_html = '<br>\n'.join(cell_contents + map0_special)
     return f'''
 <td>
 <b style="color: rgb(128,128,128); text-weight: 120%; padding: 4px">{opcode_hex}</b><br>
-{cell_info_html}
+{cell_contents_html}
 </td>
 '''
 
