@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import re
 import json
 import sqlite3
 from pathlib import Path
@@ -281,11 +282,15 @@ def make_legacy_prefix_str(inst: InstDef) -> str:
     else:
         return '-'.join(pfx) + ': '
 
+re_nd_eq = re.compile(r'ND=(?P<val>0|1)')
+re_nf_eq = re.compile(r'NF=(?P<val>0|1)')
+
 def make_vex_evex_prefix_str(inst: InstDef) -> str:
     space = inst['space'].upper()
     map = int(inst['map'])
     pp = inst['pp']
     vl = inst['vl']
+    pattern = inst['pattern']
     if vl is None or vl == 'n/a' or map == 4:
         vlen = ''
     else:
@@ -297,7 +302,20 @@ def make_vex_evex_prefix_str(inst: InstDef) -> str:
         rexw = '-WIG'
     else:
         rexw = f'-W{rexw_prefix}'
-    return f'{space}-MAP{map}-{pp}{vlen}{rexw}: '
+    m = re_nd_eq.search(pattern)
+    if m:
+        val = m.group('val')
+        nd_val = f'-ND{val}'
+    else:
+        nd_val = ''
+    m = re_nf_eq.search(pattern)
+    if m:
+        val = m.group('val')
+        nf_val = f'-NF{val}'
+    else:
+        nf_val = ''
+
+    return f'{space}-MAP{map}-{pp}{vlen}{rexw}{nd_val}{nf_val}: '
 
 def make_prefix_str(inst: InstDef) -> str:
     if inst['space'] == 'legacy':
