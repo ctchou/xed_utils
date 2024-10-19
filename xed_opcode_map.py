@@ -52,6 +52,36 @@ def get_family_color(family: str) -> str:
 max_num_maps = 11
 cell_indent = '&emsp;&emsp;&emsp;'
 
+legend_html = f'''
+<p>
+The opcode maps are shown as collapsible 16x16 tables, with empty maps omitted. </p>
+<p>
+If one clicks on any instruction mnemonic, a popup listing the instruction forms with
+that particular (map_id, opcode, mnemonic) combination will appear.
+</p>
+<p>
+Clicking the X mark or outside the popup region or pressing the Escape key closes the popup.
+</p>
+<p>
+The instruction forms are given in a notation similar, but not identical,
+to that used in Intel<sup>&reg;</sup> SDM and should be self-explanatory.
+</p>
+<p>
+If a mnemonic has an asterisk following it, clicking on the asterisk will open the corresponding
+instruction reference page at:
+<a href="https://www.felixcloutier.com/x86/" target="_blank">https://www.felixcloutier.com/x86/</a>
+</p>
+<p>
+The following color-coding scheme is used:
+<ul>
+<li><span style="color: {color_phi}">This color</span> indicates that this instruction is unique to Intel<sup>&reg;</sup> Xeon Phi.</li>
+<li><span style="color: {color_amd}">This color</span> indicates that this instruction is unique to AMD<sup>&reg;</sup>.</li>
+<li><span style="color: {color_via}">This color</span> indicates that this instruction is unique to VIA<sup>&reg;</sup>.</li>
+<li><span style="color: {color_x86}">This color</span> is used for everything else.</li>
+</ul>
+</p>
+'''
+
 def html_final(maps_html: str, modals_click_js: str, modals_exit_js) -> str:
     return f'''
 <!DOCTYPE html>
@@ -151,9 +181,7 @@ x86 opcode map
 </h1>
 
 <button class="collapsible">Legend</button>
-<div class="content">
-  <p>Legend here</p>
-</div>
+<div class="content" style="width: 50%; margin: auto; font-size: 20px">{legend_html}</div>
 
 {maps_html}
 
