@@ -8,6 +8,8 @@ the x86 instruction encoding information contained in Intel&reg; XED:
 
 https://intelxed.github.io
 
+including an x86 opcode map generator.
+
 ## Requirements
 
 Python 3.10 or above and a C compiler,
@@ -76,7 +78,7 @@ produced in the last step:
 ../xed_utils/xed_opcode_map.py test.db test.html
 ```
 The script `xed_opcode_map.py` needs the JSON file `sdm_urls.json` in the same directory.
-For how to change the location of that JSON file, run `xed_opcode_map.py -h` to see the option.
+For how to change the location of that file, run `xed_opcode_map.py -h` to see the option.
 
 The file `sdm_urls.json` contains a mapping from x86 instruction mnemonics to
 URLs of x86 instruction reference pages at:
