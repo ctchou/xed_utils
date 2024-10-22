@@ -50,7 +50,10 @@ def get_family_color(family: str) -> str:
     return color_x86
 
 max_num_maps = 11
+
 cell_indent = '&emsp;&emsp;&emsp;'
+
+center_width = 'width: 80%; max-width: 11in;'
 
 legend_html = f'''
 <p>
@@ -154,7 +157,7 @@ table, tr, td {{
   margin: auto;
   padding: 20px;
   border: 1px solid #888;
-  width: 50%;
+  {center_width}
 }}
 
 /* The Close Button */
@@ -181,7 +184,7 @@ x86 opcode map
 </h1>
 
 <button class="collapsible">Legend</button>
-<div class="content" style="width: 50%; margin: auto; font-size: 20px">{legend_html}</div>
+<div class="content" style="{center_width} margin: auto; font-size: 20px">{legend_html}</div>
 
 {maps_html}
 
