@@ -96,9 +96,11 @@ But this step is needed only when the above website changes.
 
 An example x86 opcode map generated from a full build of
 XED external release v2024.09.09 (commit id: b86dd5014463d954bc8898d2376b14852d26facd)
-can be found in `xed_utils/examples/x86_opcode_map.html`.
-After downloading and opening it using a web browser,
-please read the "Legend" section for how to use the opcode map.
+can be found at:
+
+https://ctchou.github.io/x86_opcode_map.html
+
+Please read its "Legend" section for how to use the opcode map.
 
 --------------------------------
 
