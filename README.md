@@ -12,8 +12,8 @@ including an x86 opcode map generator.
 
 ## Requirements
 
-Python 3.10 or above and a C compiler,
-the latter of which is needed only for building XED.
+The minimum requirement is Python 3.10 or above.
+But if you want to build XED as well, you will also need a C compiler.
 
 ## Installation
 
@@ -35,24 +35,30 @@ and place them as sibling directories:
  |
  |- xed_utils
 ```
-where `build` is an empty directory in which XED will be built.
+where `build` is an empty directory in which XED datafiles will be collected.
 
-## Building XED
+## Collecting XED datafiles
 
-The following commands build XED:
+The second command below collects XED datafiles:
 ```
 cd build
-../xed/mfile.py
+../xed/mfile.py just-prep
 ```
-Without any arguments, `xed/mfile.py` builds XED with all instruction definitions in XED,
-which include Xeon Phi, AMD-specific, VIA-specific, and deprecated features.
-One can optionally choose to leave out various features when building XED.
-For how to do so, run "`mfile.py -h`" to see the options.
-The ultimate input to all scripts in `xed_utils` described below is the files
-that the XED build process collects in `build/obj/dgen`.
-Thus different XED build configurations will generate different results.
+The argument `just-prep` tells the XED build script to collect XED datafiles
+without building XED.
+The collected XED datafiles are put in the directory `build/obj/dgen`
+and are the ultimate inputs to all scripts in `xed_utils`.
+Of course, you can also drop the `just-prep` argument or replace it with other
+allowed arguments (see: https://intelxed.github.io/build-manual/ for details).
 
-## Extracting a database from a XED build
+Without any options, `xed/mfile.py` collects all instruction definitions in XED,
+which include Xeon Phi, AMD-specific, VIA-specific, and deprecated features.
+One can optionally choose to leave out various features.
+For how to do so, run "`mfile.py -h`" to see the options.
+Different feature selections will cause `xed_utils` scripts
+to generate different outputs.
+
+## Extracting a database from XED datafiles
 
 Assuming the current directory is `build`, the following command
 extracts a JSON, a CSV, and an SQLite databases from a XED build.
@@ -61,11 +67,11 @@ extracts a JSON, a CSV, and an SQLite databases from a XED build.
 ```
 The script `xed_db.py` takes its input from `build/obj/dgen` and
 imports some scripts in `xed/pysrc`.
-But if the directory structure is as described above,
+If the directory structure is as described above,
 there is no need to specify them explicitly.
 (Run "`xed_db.py -h`" to see how to change those locations.)
 Any or all of the `-j`, `-c`, and `-s` arguments are optional.
-(If they are all left out, `xed_db.py` simply inputs the XED build
+(If they are all left out, `xed_db.py` simply inputs the XED datafiles
 without outputting anything.)
 Note that the `.json`, `.csv`, and `.db` filename extensions are mandatory.
 
