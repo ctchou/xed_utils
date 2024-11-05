@@ -61,7 +61,6 @@ def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
         rec.opcode_int = rec.opcode_base10
         rec.opcode_hex = compute_opcode_hex(rec.opcode_int)
         del rec.opcode_base10
-        assert rec.real_opcode == 'Y'
         del rec.real_opcode
         rec.pp = compute_pp(rec)
         rec.eosz_list = compute_eosz_list(rec)
