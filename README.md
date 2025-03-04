@@ -101,7 +101,7 @@ But this step is needed only when the above website changes.
 ## Example x86 opcode map
 
 An example x86 opcode map generated from a full build of
-XED external release v2024.11.04 (commit id: d4d502003bfff51c55c2808804301a62878d7cc8)
+XED external release v2025.03.02 (commit id: 1bdc793f5f64cf207f6776f4c0e442e39fa47903)
 can be found at:
 
 https://ctchou.github.io/x86_opcode_map.html

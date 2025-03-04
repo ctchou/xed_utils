@@ -1,5 +1,5 @@
 {
-    "_COMMENT": "generated on 2024-10-17",
+    "_COMMENT": "generated on 2025-03-04",
     "FADD": "https://www.felixcloutier.com/x86/fadd:faddp:fiadd",
     "FMUL": "https://www.felixcloutier.com/x86/fmul:fmulp:fimul",
     "FCOMP": "https://www.felixcloutier.com/x86/fcom:fcomp:fcompp",
@@ -1419,11 +1419,6 @@
     "ENCODEKEY256": "https://www.felixcloutier.com/x86/encodekey256",
     "LOADIWKEY": "https://www.felixcloutier.com/x86/loadiwkey",
     "HRESET": "https://www.felixcloutier.com/x86/hreset",
-    "CLUI": "https://www.felixcloutier.com/x86/clui",
-    "SENDUIPI": "https://www.felixcloutier.com/x86/senduipi",
-    "STUI": "https://www.felixcloutier.com/x86/stui",
-    "TESTUI": "https://www.felixcloutier.com/x86/testui",
-    "UIRET": "https://www.felixcloutier.com/x86/uiret",
     "LDTILECFG": "https://www.felixcloutier.com/x86/ldtilecfg",
     "STTILECFG": "https://www.felixcloutier.com/x86/sttilecfg",
     "TDPBF16PS": "https://www.felixcloutier.com/x86/tdpbf16ps",
@@ -1546,5 +1541,10 @@
     "VSQRTSH": "https://www.felixcloutier.com/x86/vsqrtsh",
     "VSUBPH": "https://www.felixcloutier.com/x86/vsubph",
     "VSUBSH": "https://www.felixcloutier.com/x86/vsubsh",
-    "VUCOMISH": "https://www.felixcloutier.com/x86/vucomish"
+    "VUCOMISH": "https://www.felixcloutier.com/x86/vucomish",
+    "CLUI": "https://www.felixcloutier.com/x86/clui",
+    "SENDUIPI": "https://www.felixcloutier.com/x86/senduipi",
+    "STUI": "https://www.felixcloutier.com/x86/stui",
+    "TESTUI": "https://www.felixcloutier.com/x86/testui",
+    "UIRET": "https://www.felixcloutier.com/x86/uiret"
 }
