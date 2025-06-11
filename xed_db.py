@@ -88,13 +88,18 @@ def fix_xed_db(xed_db: XED_DB) -> Tuple[XED_DB, List[str]]:
     return (xed_db, inst_attrs)
 
 def convert_xed_db(xed_db: XED_DB, inst_attrs: List[str]) -> XED_DATA:
+    from read_xed_db import Restriction
     inst_list = []
     for rec in xed_db.recs:
         inst = {}
         for attr in inst_attrs:
             val = getattr(rec, attr, None)
-            assert val is None or isinstance(val, bool) or isinstance(val, int) or isinstance(val, str)
-            inst[attr] = val
+            assert ( val is None or isinstance(val, bool) or isinstance(val, int) or isinstance(val, str) or
+                     isinstance(val, Restriction) ), val
+            if isinstance(val, Restriction):
+                inst[attr] = val.name
+            else:
+                inst[attr] = val
         inst_list.append(inst)
     xed_data = {'Instructions': inst_list}
     return xed_data
